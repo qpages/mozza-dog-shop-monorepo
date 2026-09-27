@@ -13,8 +13,13 @@
   --card-foreground: oklch(0.147 0.004 49.25);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.147 0.004 49.25);
-  --primary: oklch(0.555 0.163 48.998);
-  --primary-foreground: oklch(0.987 0.022 95.277);
+  --primary: #a55b1b;
+  --primary-foreground: #f6f1e6;
+  --canvas: #46704c;
+  --paper: #f6f1e6;
+  --ink: #101c0e;
+  --elevation-paper: 0 18px 40px -22px
+    color-mix(in srgb, var(--ink) 45%, transparent);
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.97 0.001 106.424);
@@ -24,7 +29,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.923 0.003 48.717);
   --input: oklch(0.923 0.003 48.717);
-  --ring: oklch(0.709 0.01 56.259);
+  --ring: #a55b1b;
   --chart-1: oklch(0.869 0.005 56.366);
   --chart-2: oklch(0.553 0.013 58.071);
   --chart-3: oklch(0.444 0.011 73.639);
@@ -103,6 +108,10 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-canvas: var(--canvas);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --shadow-paper: var(--elevation-paper);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -128,6 +137,34 @@
   html {
     @apply font-sans;
   }
+}
+
+@utility type-display {
+  font-family: var(--font-heading);
+  font-size: 1.875rem;
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+@utility type-section {
+  font-family: var(--font-heading);
+  font-size: 1.125rem;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+@utility type-body {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+@utility type-caption {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.4;
 }
 
 .mozza-cursor {

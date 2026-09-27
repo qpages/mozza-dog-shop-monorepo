@@ -6,9 +6,9 @@ import rateLimit from "@fastify/rate-limit";
 import sensible from "@fastify/sensible";
 import Fastify from "fastify";
 import { fileURLToPath } from "node:url";
-import { adminRoutes, requireAdmin } from "./admin/http.js";
+import { adminRoutes, protectedAdminRoutes } from "./admin/http.js";
 import dbPlugin from "./db.js";
-import { shootingAdminRoutes, shootingRoutes } from "./shooting/http.js";
+import { shootingRoutes } from "./shooting/http.js";
 import storagePlugin from "./storage.js";
 import "./types.js";
 
@@ -23,6 +23,9 @@ const envSchema = {
     PORT: { type: "integer", default: 8787 },
     HOST: { type: "string", default: "0.0.0.0" },
     NODE_ENV: { type: "string", default: "development" },
+    R2_ENDPOINT: { type: "string", default: "" },
+    R2_REGION: { type: "string", default: "auto" },
+    R2_FORCE_PATH_STYLE: { type: "boolean", default: false },
     R2_ACCOUNT_ID: { type: "string", default: "" },
     R2_ACCESS_KEY_ID: { type: "string", default: "" },
     R2_SECRET_ACCESS_KEY: { type: "string", default: "" },
@@ -76,13 +79,7 @@ export async function buildApp() {
   app.get("/health", async () => ({ ok: true }));
   await app.register(shootingRoutes);
   await app.register(adminRoutes, { prefix: "/admin" });
-  await app.register(
-    async (admin) => {
-      await admin.register(requireAdmin);
-      await admin.register(shootingAdminRoutes);
-    },
-    { prefix: "/admin" },
-  );
+  await app.register(protectedAdminRoutes, { prefix: "/admin" });
 
   return app;
 }

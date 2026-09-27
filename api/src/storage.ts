@@ -25,21 +25,29 @@ export type ObjectStorage = {
 
 export default fp(
   async (app) => {
-    const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET } =
-      app.config;
-    if (
-      !R2_ACCOUNT_ID ||
-      !R2_ACCESS_KEY_ID ||
-      !R2_SECRET_ACCESS_KEY ||
-      !R2_BUCKET
-    ) {
+    const {
+      R2_ENDPOINT,
+      R2_REGION,
+      R2_FORCE_PATH_STYLE,
+      R2_ACCOUNT_ID,
+      R2_ACCESS_KEY_ID,
+      R2_SECRET_ACCESS_KEY,
+      R2_BUCKET,
+    } = app.config;
+    const endpoint =
+      R2_ENDPOINT ||
+      (R2_ACCOUNT_ID
+        ? `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
+        : "");
+    if (!endpoint || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET) {
       app.decorate("storage", null);
       return;
     }
 
     const client = new S3Client({
-      region: "auto",
-      endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      region: R2_REGION,
+      endpoint,
+      forcePathStyle: R2_FORCE_PATH_STYLE,
       credentials: {
         accessKeyId: R2_ACCESS_KEY_ID,
         secretAccessKey: R2_SECRET_ACCESS_KEY,

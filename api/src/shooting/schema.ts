@@ -24,38 +24,54 @@ export const shootings = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     shotOn: date("shot_on", { mode: "string" }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [index("shootings_shot_on_idx").on(table.shotOn)],
-);
-
-export const dogs = pgTable(
-  "dogs",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    shootingId: uuid("shooting_id")
-      .notNull()
-      .references(() => shootings.id, { onDelete: "cascade" }),
-    ownerEmail: text("owner_email").notNull(),
     name: text("name").notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (table) => [
-    index("dogs_owner_email_idx").on(table.ownerEmail),
-    uniqueIndex("dogs_shooting_owner_name_idx").on(
+    index("shootings_shot_on_idx").on(table.shotOn),
+    check("shootings_name_not_blank", sql`length(btrim(${table.name})) > 0`),
+  ],
+);
+
+export const owners = pgTable(
+  "owners",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(),
+    dogNames: text("dog_names").array().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("owners_email_idx").on(table.email),
+    check("owners_email_lower", sql`${table.email} = lower(${table.email})`),
+  ],
+);
+
+export const shootingOwners = pgTable(
+  "shooting_owners",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    shootingId: uuid("shooting_id")
+      .notNull()
+      .references(() => shootings.id, { onDelete: "cascade" }),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => owners.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("shooting_owners_shooting_owner_idx").on(
       table.shootingId,
-      table.ownerEmail,
-      table.name,
+      table.ownerId,
     ),
-    check(
-      "dogs_email_lower",
-      sql`${table.ownerEmail} = lower(${table.ownerEmail})`,
-    ),
-    check("dogs_name_not_blank", sql`length(btrim(${table.name})) > 0`),
+    index("shooting_owners_owner_id_idx").on(table.ownerId),
   ],
 );
 
@@ -63,9 +79,9 @@ export const photos = pgTable(
   "photos",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    dogId: uuid("dog_id")
+    shootingOwnerId: uuid("shooting_owner_id")
       .notNull()
-      .references(() => dogs.id, { onDelete: "cascade" }),
+      .references(() => shootingOwners.id, { onDelete: "cascade" }),
     objectKey: text("object_key").notNull(),
     contentType: text("content_type").notNull(),
     byteSize: integer("byte_size").notNull(),
@@ -74,7 +90,7 @@ export const photos = pgTable(
       .defaultNow(),
   },
   (table) => [
-    index("photos_dog_id_idx").on(table.dogId),
+    index("photos_shooting_owner_id_idx").on(table.shootingOwnerId),
     uniqueIndex("photos_object_key_idx").on(table.objectKey),
     check(
       "photos_byte_size",
@@ -88,20 +104,31 @@ export const photos = pgTable(
 );
 
 export const shootingsRelations = relations(shootings, ({ many }) => ({
-  dogs: many(dogs),
+  shootingOwners: many(shootingOwners),
 }));
 
-export const dogsRelations = relations(dogs, ({ one, many }) => ({
-  shooting: one(shootings, {
-    fields: [dogs.shootingId],
-    references: [shootings.id],
-  }),
-  photos: many(photos),
+export const ownersRelations = relations(owners, ({ many }) => ({
+  shootingOwners: many(shootingOwners),
 }));
+
+export const shootingOwnersRelations = relations(
+  shootingOwners,
+  ({ one, many }) => ({
+    shooting: one(shootings, {
+      fields: [shootingOwners.shootingId],
+      references: [shootings.id],
+    }),
+    owner: one(owners, {
+      fields: [shootingOwners.ownerId],
+      references: [owners.id],
+    }),
+    photos: many(photos),
+  }),
+);
 
 export const photosRelations = relations(photos, ({ one }) => ({
-  dog: one(dogs, {
-    fields: [photos.dogId],
-    references: [dogs.id],
+  shootingOwner: one(shootingOwners, {
+    fields: [photos.shootingOwnerId],
+    references: [shootingOwners.id],
   }),
 }));

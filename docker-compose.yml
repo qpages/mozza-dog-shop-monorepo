@@ -17,5 +17,36 @@ services:
       timeout: 5s
       retries: 10
 
+  garage:
+    image: dxflrs/garage:v2.3.0
+    container_name: mozza-garage
+    restart: unless-stopped
+    command:
+      [
+        "/garage",
+        "-c",
+        "/etc/garage.toml",
+        "server",
+        "--single-node",
+        "--default-bucket",
+      ]
+    ports:
+      - "3910:3900"
+    environment:
+      GARAGE_DEFAULT_ACCESS_KEY: GK0123456789abcdef0123456789abcd
+      GARAGE_DEFAULT_SECRET_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      GARAGE_DEFAULT_BUCKET: mozza-photos
+    volumes:
+      - ./deploy/garage.toml:/etc/garage.toml:ro
+      - mozza-garage-meta:/var/lib/garage/meta
+      - mozza-garage-data:/var/lib/garage/data
+    healthcheck:
+      test: ["CMD", "/garage", "-c", "/etc/garage.toml", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   mozza-postgres:
+  mozza-garage-meta:
+  mozza-garage-data:

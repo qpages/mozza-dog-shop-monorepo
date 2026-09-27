@@ -9,6 +9,9 @@ export type AppConfig = {
   PORT: number;
   HOST: string;
   NODE_ENV: string;
+  R2_ENDPOINT: string;
+  R2_REGION: string;
+  R2_FORCE_PATH_STYLE: boolean;
   R2_ACCOUNT_ID: string;
   R2_ACCESS_KEY_ID: string;
   R2_SECRET_ACCESS_KEY: string;

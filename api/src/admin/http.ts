@@ -1,8 +1,9 @@
 import { eq } from "drizzle-orm";
 import type { FastifyPluginAsync } from "fastify";
+import { normalizeEmail } from "../shooting/email.js";
+import { shootingAdminRoutes } from "../shooting/http.js";
 import { verifyPassword } from "./password.js";
 import { admins } from "./schema.js";
-import { normalizeEmail } from "../shooting/email.js";
 
 const sessionCookie = {
   httpOnly: true,
@@ -57,7 +58,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   });
 };
 
-export const requireAdmin: FastifyPluginAsync = async (app) => {
+export const protectedAdminRoutes: FastifyPluginAsync = async (app) => {
   app.addHook("onRequest", async (request) => {
     try {
       await request.jwtVerify();
@@ -67,4 +68,5 @@ export const requireAdmin: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/session", async (request) => ({ email: request.user.email }));
+  await app.register(shootingAdminRoutes);
 };

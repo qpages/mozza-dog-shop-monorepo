@@ -6,11 +6,9 @@ type Gallery = {
   shootings: {
     id: string;
     shotOn: string;
-    dogs: {
-      id: string;
-      name: string;
-      photos: { id: string; url: string; byteSize: number }[];
-    }[];
+    name: string;
+    dogs: string[];
+    photos: { id: string; url: string; byteSize: number }[];
   }[];
 };
 
@@ -71,7 +69,7 @@ export function OwnerPhotos() {
           void load(value);
         }}
       >
-        <label htmlFor="email" className="text-sm font-medium">
+        <label htmlFor="email" className="type-caption font-medium">
           E-mail du shooting
         </label>
         <input
@@ -81,7 +79,7 @@ export function OwnerPhotos() {
           required
           autoComplete="email"
           placeholder="vous@email.com"
-          className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-3 h-9 rounded-lg border px-3 text-sm outline-none transition-[border-color,box-shadow] duration-200 focus-visible:border-[#46704C] focus-visible:ring-[#46704C]/15"
+          className="type-caption border-input bg-background placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 h-9 rounded-lg border px-3 outline-none transition-[border-color,box-shadow] duration-200"
         />
         <Button type="submit" size="lg" className="w-full">
           Récupérer mes photos
@@ -91,54 +89,60 @@ export function OwnerPhotos() {
   }
 
   const photoCount = gallery?.shootings.reduce(
-    (total, shooting) =>
-      total + shooting.dogs.reduce((sum, dog) => sum + dog.photos.length, 0),
+    (total, shooting) => total + shooting.photos.length,
     0,
   );
 
   return (
     <div className="flex flex-col gap-4">
       {status === "loading" ? (
-        <p className="text-muted-foreground animate-pulse text-sm motion-reduce:animate-none">
+        <p className="type-caption text-muted-foreground animate-pulse motion-reduce:animate-none">
           Chargement…
         </p>
       ) : null}
       {status === "error" ? (
-        <p className="text-destructive text-sm">
+        <p className="type-caption text-destructive">
           Le service photo est indisponible.
         </p>
       ) : null}
       {gallery && photoCount === 0 ? (
-        <p className="text-muted-foreground text-sm">
+        <p className="type-caption text-muted-foreground">
           Aucune photo pour{" "}
           <span className="text-foreground font-medium">{email}</span>.
         </p>
       ) : null}
       {gallery?.shootings.map((shooting) => (
         <section key={shooting.id} className="flex flex-col gap-3">
-          <h2 className="text-sm font-medium">{formatDate(shooting.shotOn)}</h2>
-          {shooting.dogs.map((dog) => (
-            <div key={dog.id} className="flex flex-col gap-2">
-              <p className="text-muted-foreground text-sm">{dog.name}</p>
-              <div className="grid grid-cols-2 gap-2">
-                {dog.photos.map((photo) => (
-                  <a
-                    key={photo.id}
-                    href={photo.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block overflow-hidden rounded-lg"
-                  >
-                    <img
-                      src={photo.url}
-                      alt={`Photo de ${dog.name}`}
-                      className="aspect-square w-full object-cover"
-                    />
-                  </a>
-                ))}
-              </div>
-            </div>
-          ))}
+          <h2 className="type-section">
+            {shooting.name}
+            <span className="type-caption text-muted-foreground">
+              {`, le ${formatDate(shooting.shotOn)}`}
+            </span>
+          </h2>
+          {shooting.dogs.length > 0 ? (
+            <p className="type-caption text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
+              {shooting.dogs.map((dog) => (
+                <span key={dog}>{dog}</span>
+              ))}
+            </p>
+          ) : null}
+          <div className="grid grid-cols-2 gap-2">
+            {shooting.photos.map((photo) => (
+              <a
+                key={photo.id}
+                href={photo.url}
+                target="_blank"
+                rel="noreferrer"
+                className="block overflow-hidden rounded-lg"
+              >
+                <img
+                  src={photo.url}
+                  alt=""
+                  className="aspect-square w-full object-cover"
+                />
+              </a>
+            ))}
+          </div>
         </section>
       ))}
       <Button variant="outline" nativeButton={false} render={<a href="/" />}>

@@ -8,6 +8,41 @@
       "when": 1790515465837,
       "tag": "0000_rare_reaper",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790517652492,
+      "tag": "0001_owner_sheet",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790518406448,
+      "tag": "0002_shooting_archived_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790543781224,
+      "tag": "0003_owner_sheet_photos",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790544520911,
+      "tag": "0004_owner_dog_names",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790545835277,
+      "tag": "0005_owner_dog_names_optional",
+      "breakpoints": true
     }
   ]
 }

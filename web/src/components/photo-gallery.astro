@@ -41,9 +41,10 @@
     width: 100%;
     aspect-ratio: 4 / 5;
     margin-inline: -0.35rem;
-    background: #f6f1e6;
+    background: var(--paper);
     padding: 0.35rem 0.35rem 0.7rem;
-    box-shadow: 0 16px 32px -20px rgba(16, 28, 14, 0.4);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--elevation-paper);
     transform: rotate(var(--r)) translateY(var(--y));
     transition: transform 350ms cubic-bezier(0.22, 1, 0.36, 1);
   }
@@ -52,6 +53,7 @@
     display: block;
     height: 100%;
     overflow: hidden;
+    border-radius: var(--radius-lg);
   }
 
   .print img {

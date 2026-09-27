@@ -32,3 +32,4 @@ Deux modules, pas plus.
 - Le schéma de l'agrégat tient dans un fichier. Pas de couche repository ni use-case : les routes Fastify du module parlent à Drizzle.
 - `db.ts` et `storage.ts` restent hors des modules. Le stockage objet n'est pas nommé d'après le fournisseur dans le domaine.
 - Le web nomme les écrans métier (`owner-photos`). `pages/` suit les URLs. `components/ui/` reste le kit.
+- Le texte visible n'utilise ni le point (`.`), ni le point médian (`·`), ni le tiret (`-`, `–`, `—`) comme séparateur. Relier avec des mots : « Archivé le 26 septembre 2026 ».

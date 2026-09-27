@@ -1,10 +1,9 @@
 ---
 import PhotoGallery from "@/components/photo-gallery.astro";
-import { OwnerPhotos } from "@/components/owner-photos";
 import Layout from "@/layouts/main.astro";
 ---
 
-<Layout title="Vos photos, Mozza Dog Shop">
+<Layout title="Page introuvable, Mozza Dog Shop">
   <div class="bg-canvas relative flex min-h-screen flex-col">
     <div
       class="pointer-events-none absolute inset-0 opacity-40"
@@ -40,13 +39,20 @@ import Layout from "@/layouts/main.astro";
         class="copy mx-auto flex w-full max-w-md shrink-0 flex-col gap-5 px-6"
       >
         <div class="text-paper flex flex-col gap-2 text-center">
-          <h1 class="type-display">Vos photos</h1>
-          <p class="type-body text-paper/95">
-            Récupérez les clichés de votre shooting avec votre chien.
-          </p>
+          <h1 class="type-display">Page introuvable</h1>
+          <p class="type-body text-paper/95">Ce lien ne mène à aucune page.</p>
         </div>
-        <div class="bg-paper shadow-paper rounded-2xl p-5">
-          <OwnerPhotos client:load />
+        <div class="bg-paper shadow-paper flex flex-col gap-4 rounded-2xl p-5">
+          <p class="type-body">
+            Vos photos se récupèrent depuis l’accueil, avec l’e-mail du
+            shooting.
+          </p>
+          <a
+            href="/"
+            class="bg-primary text-primary-foreground hover:bg-primary/80 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 inline-flex h-9 w-full items-center justify-center rounded-lg px-2.5 text-sm font-medium transition-colors focus-visible:outline-none"
+          >
+            Retour à l’accueil
+          </a>
         </div>
       </main>
       <PhotoGallery />

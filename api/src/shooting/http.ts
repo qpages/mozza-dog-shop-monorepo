@@ -1,22 +1,24 @@
 import { and, desc, eq } from "drizzle-orm";
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { randomUUID } from "node:crypto";
 import { requireStorage } from "../types.js";
 import { normalizeEmail } from "./email.js";
 import {
-  dogs,
   MAX_PHOTO_BYTES,
+  owners,
   PHOTO_CONTENT_TYPES,
   photos,
+  shootingOwners,
   shootings,
 } from "./schema.js";
 
 const contentTypeSchema = { type: "string", enum: [...PHOTO_CONTENT_TYPES] };
 
 type PhotoRow = typeof photos.$inferSelect;
-type DogRow = typeof dogs.$inferSelect & {
+type SheetRow = typeof shootingOwners.$inferSelect & {
   photos: PhotoRow[];
   shooting: typeof shootings.$inferSelect;
+  owner: typeof owners.$inferSelect;
 };
 
 export const shootingRoutes: FastifyPluginAsync = async (app) => {
@@ -42,15 +44,19 @@ export const shootingRoutes: FastifyPluginAsync = async (app) => {
     },
     async (request) => {
       const email = normalizeEmail(request.query.email);
-      const rows = await app.db.query.dogs.findMany({
-        where: eq(dogs.ownerEmail, email),
+      const owner = await app.db.query.owners.findFirst({
+        where: eq(owners.email, email),
         with: {
-          shooting: true,
-          photos: true,
+          shootingOwners: { with: { shooting: true, photos: true } },
         },
       });
+      const rows =
+        owner?.shootingOwners.map((sheet) => ({
+          ...sheet,
+          owner,
+        })) ?? [];
 
-      const hasPhotos = rows.some((dog) => dog.photos.length > 0);
+      const hasPhotos = rows.some((row) => row.photos.length > 0);
       if (hasPhotos && !app.storage) {
         throw app.httpErrors.serviceUnavailable(
           "object storage is not configured",
@@ -66,32 +72,39 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
   app.get("/shootings", async () => {
     const rows = await app.db.query.shootings.findMany({
       orderBy: [desc(shootings.shotOn)],
-      with: { dogs: { with: { photos: true } } },
+      with: {
+        shootingOwners: {
+          with: { photos: true, owner: true },
+        },
+      },
     });
     return {
       shootings: rows.map((shooting) => ({
         id: shooting.id,
         shotOn: shooting.shotOn,
-        dogs: shooting.dogs.map((dog) => ({
-          id: dog.id,
-          name: dog.name,
-          ownerEmail: dog.ownerEmail,
-          photoCount: dog.photos.length,
+        name: shooting.name,
+        archived: shooting.archivedAt !== null,
+        owners: shooting.shootingOwners.map((sheet) => ({
+          id: sheet.owner.id,
+          email: sheet.owner.email,
+          photoCount: sheet.photos.length,
+          dogs: sheet.owner.dogNames,
         })),
       })),
     };
   });
 
-  app.post<{ Body: { shotOn: string } }>(
+  app.post<{ Body: { shotOn: string; name: string } }>(
     "/shootings",
     {
       schema: {
         body: {
           type: "object",
-          required: ["shotOn"],
+          required: ["shotOn", "name"],
           additionalProperties: false,
           properties: {
             shotOn: { type: "string", format: "date" },
+            name: { type: "string", minLength: 1, maxLength: 80 },
           },
         },
       },
@@ -99,15 +112,63 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const [shooting] = await app.db
         .insert(shootings)
-        .values({ shotOn: request.body.shotOn })
-        .returning({ id: shootings.id, shotOn: shootings.shotOn });
+        .values({
+          shotOn: request.body.shotOn,
+          name: request.body.name.trim(),
+        })
+        .returning({
+          id: shootings.id,
+          shotOn: shootings.shotOn,
+          name: shootings.name,
+        });
       return reply.code(201).send(shooting);
+    },
+  );
+
+  app.delete<{ Params: { shootingId: string } }>(
+    "/shootings/:shootingId",
+    { schema: { params: uuidParams("shootingId") } },
+    async (request, reply) => {
+      const [removed] = await app.db
+        .delete(shootings)
+        .where(eq(shootings.id, request.params.shootingId))
+        .returning({ id: shootings.id });
+      if (!removed) throw app.httpErrors.notFound("shooting not found");
+      return reply.code(204).send();
+    },
+  );
+
+  app.post<{ Params: { shootingId: string } }>(
+    "/shootings/:shootingId/archive",
+    { schema: { params: uuidParams("shootingId") } },
+    async (request) => {
+      const [shooting] = await app.db
+        .update(shootings)
+        .set({ archivedAt: new Date() })
+        .where(eq(shootings.id, request.params.shootingId))
+        .returning({ id: shootings.id, archivedAt: shootings.archivedAt });
+      if (!shooting) throw app.httpErrors.notFound("shooting not found");
+      return { id: shooting.id, archived: true };
+    },
+  );
+
+  app.post<{ Params: { shootingId: string } }>(
+    "/shootings/:shootingId/restore",
+    { schema: { params: uuidParams("shootingId") } },
+    async (request) => {
+      const [shooting] = await app.db
+        .update(shootings)
+        .set({ archivedAt: null })
+        .where(eq(shootings.id, request.params.shootingId))
+        .returning({ id: shootings.id });
+      if (!shooting) throw app.httpErrors.notFound("shooting not found");
+      return { id: shooting.id, archived: false };
     },
   );
 
   app.post<{
     Params: { shootingId: string };
-    Body: { email: string; name: string };
+    Body: { email: string; names: string[] };
   }>(
     "/shootings/:shootingId/dogs",
     {
@@ -115,11 +176,16 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
         params: uuidParams("shootingId"),
         body: {
           type: "object",
-          required: ["email", "name"],
+          required: ["email", "names"],
           additionalProperties: false,
           properties: {
             email: { type: "string", format: "email", maxLength: 320 },
-            name: { type: "string", minLength: 1, maxLength: 80 },
+            names: {
+              type: "array",
+              minItems: 1,
+              maxItems: 8,
+              items: { type: "string", minLength: 1, maxLength: 80 },
+            },
           },
         },
       },
@@ -129,39 +195,126 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
         where: eq(shootings.id, request.params.shootingId),
       });
       if (!shooting) throw app.httpErrors.notFound("shooting not found");
+      if (shooting.archivedAt) {
+        throw app.httpErrors.conflict("shooting is archived");
+      }
 
       const email = normalizeEmail(request.body.email);
-      const name = request.body.name.trim();
-      try {
-        const [dog] = await app.db
-          .insert(dogs)
-          .values({ shootingId: shooting.id, ownerEmail: email, name })
-          .returning({
-            id: dogs.id,
-            name: dogs.name,
-            ownerEmail: dogs.ownerEmail,
-          });
-        return reply.code(201).send(dog);
-      } catch (error) {
-        if (isUniqueViolation(error)) {
-          throw app.httpErrors.conflict("dog already exists for this shooting");
+      const names = [...new Set(request.body.names.map((name) => name.trim()))];
+      const result = await app.db.transaction(async (tx) => {
+        const [owner] = await tx
+          .insert(owners)
+          .values({ email, dogNames: names })
+          .onConflictDoUpdate({
+            target: owners.email,
+            set: { email },
+          })
+          .returning({ id: owners.id, dogNames: owners.dogNames });
+
+        const existingSheet = await tx.query.shootingOwners.findFirst({
+          where: and(
+            eq(shootingOwners.shootingId, shooting.id),
+            eq(shootingOwners.ownerId, owner.id),
+          ),
+        });
+        const known = new Set(owner.dogNames);
+        const added: string[] = [];
+        const skipped: string[] = [];
+
+        for (const name of names) {
+          if (known.has(name) && existingSheet) {
+            skipped.push(name);
+            continue;
+          }
+          if (!known.has(name)) known.add(name);
+          added.push(name);
         }
-        throw error;
+
+        if (added.length > 0 && known.size !== owner.dogNames.length) {
+          await tx
+            .update(owners)
+            .set({ dogNames: [...known] })
+            .where(eq(owners.id, owner.id));
+        }
+        if (added.length > 0 && !existingSheet) {
+          await tx.insert(shootingOwners).values({
+            shootingId: shooting.id,
+            ownerId: owner.id,
+          });
+        }
+
+        return { added, skipped };
+      });
+
+      if (result.added.length === 0) {
+        throw app.httpErrors.conflict("dog already exists for this shooting");
       }
+      return reply.code(201).send(result);
+    },
+  );
+
+  app.delete<{
+    Params: { shootingId: string; ownerId: string };
+    Body: { name: string };
+  }>(
+    "/shootings/:shootingId/owners/:ownerId/dogs",
+    {
+      schema: {
+        params: uuidParams("shootingId", "ownerId"),
+        body: {
+          type: "object",
+          required: ["name"],
+          additionalProperties: false,
+          properties: {
+            name: { type: "string", minLength: 1, maxLength: 80 },
+          },
+        },
+      },
+    },
+    async (request) => {
+      const shooting = await app.db.query.shootings.findFirst({
+        where: eq(shootings.id, request.params.shootingId),
+      });
+      if (!shooting) throw app.httpErrors.notFound("shooting not found");
+      if (shooting.archivedAt) {
+        throw app.httpErrors.conflict("shooting is archived");
+      }
+
+      const sheet = await findSheet(
+        app,
+        request.params.shootingId,
+        request.params.ownerId,
+      );
+      const owner = await app.db.query.owners.findFirst({
+        where: eq(owners.id, sheet.ownerId),
+      });
+      if (!owner) throw app.httpErrors.notFound("owner not found");
+
+      const name = request.body.name.trim();
+      if (!owner.dogNames.includes(name)) {
+        throw app.httpErrors.notFound("dog not found");
+      }
+
+      await app.db
+        .update(owners)
+        .set({ dogNames: owner.dogNames.filter((dog) => dog !== name) })
+        .where(eq(owners.id, owner.id));
+
+      return { removed: name };
     },
   );
 
   app.post<{
-    Params: { dogId: string };
+    Params: { shootingId: string; ownerId: string };
     Body: {
       contentType: (typeof PHOTO_CONTENT_TYPES)[number];
       byteSize: number;
     };
   }>(
-    "/dogs/:dogId/photos/presign",
+    "/shootings/:shootingId/owners/:ownerId/photos/presign",
     {
       schema: {
-        params: uuidParams("dogId"),
+        params: uuidParams("shootingId", "ownerId"),
         body: {
           type: "object",
           required: ["contentType", "byteSize"],
@@ -179,13 +332,14 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
     },
     async (request) => {
       const storage = requireStorage(app);
-      const dog = await app.db.query.dogs.findFirst({
-        where: eq(dogs.id, request.params.dogId),
-      });
-      if (!dog) throw app.httpErrors.notFound("dog not found");
+      const sheet = await findSheet(
+        app,
+        request.params.shootingId,
+        request.params.ownerId,
+      );
 
       const photoId = randomUUID();
-      const objectKey = `shootings/${dog.shootingId}/dogs/${dog.id}/${photoId}`;
+      const objectKey = `shootings/${sheet.shootingId}/owners/${sheet.ownerId}/${photoId}`;
       const url = await storage.presignPut({
         key: objectKey,
         contentType: request.body.contentType,
@@ -203,17 +357,17 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
   );
 
   app.post<{
-    Params: { dogId: string };
+    Params: { shootingId: string; ownerId: string };
     Body: {
       objectKey: string;
       contentType: (typeof PHOTO_CONTENT_TYPES)[number];
       byteSize: number;
     };
   }>(
-    "/dogs/:dogId/photos",
+    "/shootings/:shootingId/owners/:ownerId/photos",
     {
       schema: {
-        params: uuidParams("dogId"),
+        params: uuidParams("shootingId", "ownerId"),
         body: {
           type: "object",
           required: ["objectKey", "contentType", "byteSize"],
@@ -232,21 +386,25 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
     },
     async (request, reply) => {
       const storage = requireStorage(app);
-      const dog = await app.db.query.dogs.findFirst({
-        where: eq(dogs.id, request.params.dogId),
-      });
-      if (!dog) throw app.httpErrors.notFound("dog not found");
+      const sheet = await findSheet(
+        app,
+        request.params.shootingId,
+        request.params.ownerId,
+      );
 
       const { objectKey, contentType, byteSize } = request.body;
-      const prefix = `shootings/${dog.shootingId}/dogs/${dog.id}/`;
+      const prefix = `shootings/${sheet.shootingId}/owners/${sheet.ownerId}/`;
       if (!objectKey.startsWith(prefix)) {
         throw app.httpErrors.badRequest(
-          "object key does not belong to this dog",
+          "object key does not belong to this owner",
         );
       }
 
       const existing = await app.db.query.photos.findFirst({
-        where: and(eq(photos.dogId, dog.id), eq(photos.objectKey, objectKey)),
+        where: and(
+          eq(photos.shootingOwnerId, sheet.id),
+          eq(photos.objectKey, objectKey),
+        ),
       });
       if (existing) {
         return { id: existing.id, objectKey: existing.objectKey };
@@ -262,7 +420,13 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
       const id = objectKey.slice(prefix.length);
       const [photo] = await app.db
         .insert(photos)
-        .values({ id, dogId: dog.id, objectKey, contentType, byteSize })
+        .values({
+          id,
+          shootingOwnerId: sheet.id,
+          objectKey,
+          contentType,
+          byteSize,
+        })
         .returning({ id: photos.id, objectKey: photos.objectKey });
 
       return reply.code(201).send(photo);
@@ -270,62 +434,55 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
   );
 };
 
-function uuidParams(name: string) {
+function uuidParams(...names: string[]) {
   return {
     type: "object",
-    required: [name],
-    properties: {
-      [name]: { type: "string", format: "uuid" },
-    },
+    required: names,
+    properties: Object.fromEntries(
+      names.map((name) => [name, { type: "string", format: "uuid" }]),
+    ),
   };
 }
 
-function isUniqueViolation(error: unknown): boolean {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "23505"
-  ) {
-    return true;
-  }
-  if (typeof error === "object" && error !== null && "cause" in error) {
-    return isUniqueViolation(error.cause);
-  }
-  return false;
+async function findSheet(
+  app: FastifyInstance,
+  shootingId: string,
+  ownerId: string,
+) {
+  const sheet = await app.db.query.shootingOwners.findFirst({
+    where: and(
+      eq(shootingOwners.shootingId, shootingId),
+      eq(shootingOwners.ownerId, ownerId),
+    ),
+  });
+  if (!sheet) throw app.httpErrors.notFound("owner not found");
+  return sheet;
 }
 
 async function groupByShooting(
   storage: { presignGet: (key: string) => Promise<string> } | null,
-  rows: DogRow[],
+  rows: SheetRow[],
 ) {
   const byShooting = new Map<
     string,
     {
       id: string;
       shotOn: string;
-      dogs: {
+      name: string;
+      dogs: string[];
+      photos: {
         id: string;
-        name: string;
-        photos: {
-          id: string;
-          url: string;
-          byteSize: number;
-          contentType: string;
-        }[];
+        url: string;
+        byteSize: number;
+        contentType: string;
       }[];
     }
   >();
 
-  for (const dog of rows) {
-    let shooting = byShooting.get(dog.shooting.id);
-    if (!shooting) {
-      shooting = { id: dog.shooting.id, shotOn: dog.shooting.shotOn, dogs: [] };
-      byShooting.set(dog.shooting.id, shooting);
-    }
-
+  for (const sheet of rows) {
+    if (sheet.shooting.archivedAt) continue;
     const listed = [];
-    for (const photo of dog.photos) {
+    for (const photo of sheet.photos) {
       listed.push({
         id: photo.id,
         url: storage ? await storage.presignGet(photo.objectKey) : "",
@@ -334,7 +491,13 @@ async function groupByShooting(
       });
     }
 
-    shooting.dogs.push({ id: dog.id, name: dog.name, photos: listed });
+    byShooting.set(sheet.shooting.id, {
+      id: sheet.shooting.id,
+      shotOn: sheet.shooting.shotOn,
+      name: sheet.shooting.name,
+      dogs: sheet.owner.dogNames,
+      photos: listed,
+    });
   }
 
   return [...byShooting.values()].sort((a, b) =>
