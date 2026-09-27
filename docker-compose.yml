@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: mozza-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: mozza
+      POSTGRES_PASSWORD: mozza
+      POSTGRES_DB: mozza
+    volumes:
+      - mozza-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mozza -d mozza"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mozza-postgres:

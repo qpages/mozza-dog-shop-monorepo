@@ -1,0 +1,80 @@
+<div class="prints" aria-hidden="true">
+  <div class="print" style="--r: -3deg; --y: 6px">
+    <span class="frame">
+      <img src="/photos/corgi-douche.jpg" alt="" />
+    </span>
+  </div>
+  <div class="print" style="--r: -1.5deg; --y: -4px">
+    <span class="frame">
+      <img src="/photos/chien-plage.jpg" alt="" />
+    </span>
+  </div>
+  <div class="print" style="--r: 0.5deg; --y: 2px">
+    <span class="frame">
+      <img src="/photos/chiens-panier.png" alt="" />
+    </span>
+  </div>
+  <div class="print" style="--r: 2.5deg; --y: -5px">
+    <span class="frame">
+      <img src="/photos/chien-portrait.jpg" alt="" />
+    </span>
+  </div>
+  <div class="print" style="--r: -2deg; --y: 5px">
+    <span class="frame">
+      <img src="/photos/gobelet-mozza.jpg" alt="" />
+    </span>
+  </div>
+</div>
+
+<style>
+  .prints {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 11rem));
+    justify-content: center;
+    width: min(100% - 2rem, 52rem);
+    flex-shrink: 0;
+    margin-inline: auto;
+    padding-block: 0.75rem 1.5rem;
+  }
+
+  .print {
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    margin-inline: -0.35rem;
+    background: #f6f1e6;
+    padding: 0.35rem 0.35rem 0.7rem;
+    box-shadow: 0 16px 32px -20px rgba(16, 28, 14, 0.4);
+    transform: rotate(var(--r)) translateY(var(--y));
+    transition: transform 350ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .frame {
+    display: block;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .print img {
+    display: block;
+    height: 100%;
+    width: 100%;
+    object-fit: cover;
+    object-position: center 30%;
+  }
+
+  .print:last-child img {
+    object-position: 24% center;
+  }
+
+  @media (hover: hover) {
+    .print:hover {
+      transform: rotate(calc(var(--r) * 0.15)) translateY(var(--y));
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .print {
+      transition: none;
+    }
+  }
+</style>

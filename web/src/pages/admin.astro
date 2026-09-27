@@ -1,0 +1,117 @@
+---
+import { readFileSync } from "node:fs";
+import { AdminApp } from "@/components/admin-app";
+import Layout from "@/layouts/main.astro";
+
+const devAdmin = readDevAdmin();
+
+function readDevAdmin() {
+  if (!import.meta.env.DEV) return { email: "", password: "" };
+
+  try {
+    const raw = readFileSync(
+      new URL("../../../api/.env", import.meta.url),
+      "utf8",
+    );
+    const values = new Map<string, string>();
+    for (const line of raw.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const separator = trimmed.indexOf("=");
+      if (separator === -1) continue;
+      const key = trimmed.slice(0, separator).trim();
+      let value = trimmed.slice(separator + 1).trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      values.set(key, value);
+    }
+    return {
+      email: values.get("ADMIN_EMAIL") ?? "",
+      password: values.get("ADMIN_PASSWORD") ?? "",
+    };
+  } catch {
+    return { email: "", password: "" };
+  }
+}
+---
+
+<Layout title="Espace admin — Mozza Dog Shop">
+  <div class="relative flex min-h-screen flex-col bg-[#46704C]">
+    <div
+      class="pointer-events-none absolute inset-0 opacity-40"
+      style="background-image: radial-gradient(rgba(255,255,255,0.16) 0.6px, transparent 0.6px); background-size: 3px 3px;"
+      aria-hidden="true"
+    >
+    </div>
+    <AdminApp
+      client:load
+      defaultEmail={devAdmin.email}
+      defaultPassword={devAdmin.password}
+    />
+  </div>
+</Layout>
+
+<style>
+  :global(.admin-logo) {
+    display: inline-block;
+    opacity: 0.92;
+    transition: opacity 500ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  :global(.admin-logo:hover),
+  :global(.admin-logo:focus-visible) {
+    opacity: 1;
+  }
+
+  :global(.admin-link) {
+    position: relative;
+    font-size: 0.875rem;
+    color: #f6f1e6;
+  }
+
+  :global(.admin-link::after) {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -3px;
+    width: 100%;
+    height: 1px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  :global(.admin-link:hover::after),
+  :global(.admin-link:focus-visible::after) {
+    transform: scaleX(1);
+  }
+
+  :global(.admin-rise) {
+    animation: rise 1000ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      translate: 0 12px;
+    }
+    to {
+      opacity: 1;
+      translate: 0 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(.admin-logo),
+    :global(.admin-link::after),
+    :global(.admin-rise) {
+      animation: none;
+      transition: none;
+    }
+  }
+</style>

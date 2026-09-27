@@ -1,0 +1,82 @@
+---
+import PhotoGallery from "@/components/photo-gallery.astro";
+import { OwnerPhotos } from "@/components/owner-photos";
+import Layout from "@/layouts/main.astro";
+---
+
+<Layout title="Vos photos — Mozza Dog Shop">
+  <div class="relative flex min-h-screen flex-col bg-[#46704C]">
+    <div
+      class="pointer-events-none absolute inset-0 opacity-40"
+      style="background-image: radial-gradient(rgba(255,255,255,0.16) 0.6px, transparent 0.6px); background-size: 3px 3px;"
+      aria-hidden="true"
+    >
+    </div>
+
+    <header
+      class="relative z-10 flex items-center justify-between px-5 py-4 sm:px-8 sm:py-5"
+    >
+      <a href="/" aria-label="Mozza Dog Shop">
+        <img
+          src="/logo.png"
+          alt=""
+          width="600"
+          height="338"
+          class="h-16 w-auto sm:h-20"
+        />
+      </a>
+      <a
+        href="/admin"
+        class="text-sm text-[#f6f1e6] underline-offset-4 hover:underline focus-visible:underline"
+      >
+        Espace admin
+      </a>
+    </header>
+
+    <div
+      class="relative z-10 flex flex-1 flex-col items-center justify-center gap-10 py-8"
+    >
+      <main
+        class="copy mx-auto flex w-full max-w-md shrink-0 flex-col gap-5 px-6"
+      >
+        <div class="flex flex-col gap-2 text-center text-[#f6f1e6]">
+          <h1 class="font-heading text-3xl font-semibold tracking-tight">
+            Vos photos
+          </h1>
+          <p class="text-[#f6f1e6]/80">
+            Récupérez les clichés de votre shooting avec votre chien.
+          </p>
+        </div>
+        <div
+          class="rounded-2xl bg-[#f6f1e6] p-5 shadow-[0_18px_40px_-22px_rgba(16,28,14,0.45)]"
+        >
+          <OwnerPhotos client:load />
+        </div>
+      </main>
+      <PhotoGallery />
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .copy {
+    animation: rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      translate: 0 8px;
+    }
+    to {
+      opacity: 1;
+      translate: 0 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .copy {
+      animation: none;
+    }
+  }
+</style>
