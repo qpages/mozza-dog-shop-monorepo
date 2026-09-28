@@ -1,6 +1,8 @@
 import {
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  PutBucketCorsCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -20,8 +22,22 @@ export type ObjectStorage = {
   presignGet: (key: string) => Promise<string>;
   head: (
     key: string,
-  ) => Promise<{ byteSize: number; contentType: string | undefined }>;
+  ) => Promise<{ byteSize: number; contentType: string | undefined } | null>;
+  removeMany: (keys: string[]) => Promise<void>;
 };
+
+const DELETE_BATCH_SIZE = 1000;
+
+function isNotFound(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (("name" in error && error.name === "NotFound") ||
+      ("$metadata" in error &&
+        (error as { $metadata?: { httpStatusCode?: number } }).$metadata
+          ?.httpStatusCode === 404))
+  );
+}
 
 export default fp(
   async (app) => {
@@ -52,7 +68,38 @@ export default fp(
         accessKeyId: R2_ACCESS_KEY_ID,
         secretAccessKey: R2_SECRET_ACCESS_KEY,
       },
+      // AWS SDK v3 adds a CRC32 checksum header by default, which bakes the
+      // checksum of an empty body into presigned PUT URLs and makes S3-compatible
+      // stores (R2, Garage, MinIO) reject the real upload with InvalidDigest.
+      requestChecksumCalculation: "WHEN_REQUIRED",
+      responseChecksumValidation: "WHEN_REQUIRED",
     });
+
+    // The browser uploads and reads photos directly from the object store,
+    // cross-origin from WEB_ORIGIN. A presigned PUT with a content-type header
+    // triggers a CORS preflight, so the bucket must allow that origin or the
+    // browser blocks the request. Applying the rules on boot keeps the config
+    // in sync with WEB_ORIGIN and survives a store reset (pnpm db:reset).
+    try {
+      await client.send(
+        new PutBucketCorsCommand({
+          Bucket: R2_BUCKET,
+          CORSConfiguration: {
+            CORSRules: [
+              {
+                AllowedOrigins: [app.config.WEB_ORIGIN],
+                AllowedMethods: ["GET", "PUT", "HEAD"],
+                AllowedHeaders: ["*"],
+                ExposeHeaders: ["ETag"],
+                MaxAgeSeconds: 3600,
+              },
+            ],
+          },
+        }),
+      );
+    } catch (error) {
+      app.log.warn({ err: error }, "could not apply bucket CORS rules");
+    }
 
     const storage: ObjectStorage = {
       bucket: R2_BUCKET,
@@ -74,13 +121,32 @@ export default fp(
           { expiresIn: GET_TTL_SECONDS },
         ),
       head: async (key) => {
-        const result = await client.send(
-          new HeadObjectCommand({ Bucket: R2_BUCKET, Key: key }),
-        );
-        return {
-          byteSize: result.ContentLength ?? 0,
-          contentType: result.ContentType,
-        };
+        try {
+          const result = await client.send(
+            new HeadObjectCommand({ Bucket: R2_BUCKET, Key: key }),
+          );
+          return {
+            byteSize: result.ContentLength ?? 0,
+            contentType: result.ContentType,
+          };
+        } catch (error) {
+          if (isNotFound(error)) return null;
+          throw error;
+        }
+      },
+      removeMany: async (keys) => {
+        for (let i = 0; i < keys.length; i += DELETE_BATCH_SIZE) {
+          const chunk = keys.slice(i, i + DELETE_BATCH_SIZE);
+          await client.send(
+            new DeleteObjectsCommand({
+              Bucket: R2_BUCKET,
+              Delete: {
+                Objects: chunk.map((Key) => ({ Key })),
+                Quiet: true,
+              },
+            }),
+          );
+        }
       },
     };
 

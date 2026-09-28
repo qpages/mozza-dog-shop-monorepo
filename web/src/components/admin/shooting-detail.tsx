@@ -4,10 +4,11 @@ import {
   ArchiveRestore,
   ChevronLeft,
   Ellipsis,
+  Pencil,
   Plus,
   Trash2,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { ShootingMeta } from "@/components/admin/shooting-meta";
 import { OwnerRow } from "@/components/admin/owner-row";
@@ -19,6 +20,14 @@ import {
 } from "@/components/admin/styles";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -26,7 +35,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   addDogs,
+  addShootingOwner,
+  deletePhotos,
   removeDog,
+  updateShooting,
   uploadPhotos,
   type Shooting,
 } from "@/lib/admin-client";
@@ -50,9 +62,12 @@ export function ShootingDetail({
 }: Props) {
   const heading = useRef<HTMLHeadingElement>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [addingNew, setAddingNew] = useState(false);
   const [removingKey, setRemovingKey] = useState<string | null>(null);
   const [uploadingOwnerId, setUploadingOwnerId] = useState<string | null>(null);
+  const [deletingOwnerId, setDeletingOwnerId] = useState<string | null>(null);
   const empty = shooting.owners.length === 0;
   const showForm = !shooting.archived && (formOpen || empty);
 
@@ -60,19 +75,20 @@ export function ShootingDetail({
     heading.current?.focus();
   }, [shooting.id]);
 
-  async function addDog(email: string, name: string) {
-    const trimmed = name.trim();
+  async function saveDog(
+    trimmed: string,
+    run: () => Promise<
+      { added: string[]; skipped: string[] } | "duplicate" | "error"
+    >,
+  ) {
     if (!trimmed) {
       toast.error("Indique un nom de chien.");
       return false;
     }
     try {
-      const result = await addDogs(shooting.id, {
-        email,
-        names: [trimmed],
-      });
+      const result = await run();
       if (result === "duplicate") {
-        toast.error("Ce chien est déjà sur ce shooting.");
+        toast.error("Ce chien est déjà associé à ce maître.");
         return false;
       }
       if (result === "error") {
@@ -88,11 +104,23 @@ export function ShootingDetail({
     }
   }
 
+  function addOwner(email: string, name: string) {
+    const trimmed = name.trim();
+    return saveDog(trimmed, () =>
+      addShootingOwner(shooting.id, { email, names: [trimmed] }),
+    );
+  }
+
+  function addDog(ownerId: string, name: string) {
+    const trimmed = name.trim();
+    return saveDog(trimmed, () => addDogs(ownerId, [trimmed]));
+  }
+
   async function onRemoveDog(ownerId: string, name: string) {
     if (removingKey) return;
     setRemovingKey(`${ownerId}:${name}`);
     try {
-      const result = await removeDog(shooting.id, ownerId, name);
+      const result = await removeDog(ownerId, name);
       if (result === "error") {
         toast.error("Impossible de retirer le chien.");
         return;
@@ -125,9 +153,58 @@ export function ShootingDetail({
         onChanged();
       }
     } catch {
-      toast.error("Impossible d'envoyer les photos.");
+      toast.error("Impossible d'ajouter la/les photos.");
     } finally {
       setUploadingOwnerId(null);
+    }
+  }
+
+  async function onDeletePhotos(ownerId: string, photoIds: string[]) {
+    if (deletingOwnerId || photoIds.length === 0) return;
+    setDeletingOwnerId(ownerId);
+    try {
+      const result = await deletePhotos(shooting.id, ownerId, photoIds);
+      if (result === "error") {
+        toast.error("Impossible de supprimer les photos.");
+        return;
+      }
+      toast.success(
+        photoIds.length === 1
+          ? "1 photo supprimée."
+          : `${photoIds.length} photos supprimées.`,
+      );
+      onChanged();
+    } catch {
+      toast.error("Impossible de supprimer les photos.");
+    } finally {
+      setDeletingOwnerId(null);
+    }
+  }
+
+  async function onSaveEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving) return;
+    const data = new FormData(event.currentTarget);
+    const name = String(data.get("name") ?? "").trim();
+    const shotOn = String(data.get("shotOn") ?? "");
+    if (!name) {
+      toast.error("Indique un nom de shooting.");
+      return;
+    }
+    setSaving(true);
+    setEditOpen(false);
+    try {
+      const ok = await updateShooting(shooting.id, { name, shotOn });
+      if (!ok) {
+        toast.error("Impossible de modifier le shooting.");
+        return;
+      }
+      toast.success("Shooting modifié.");
+      onChanged();
+    } catch {
+      toast.error("Impossible de modifier le shooting.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -184,6 +261,10 @@ export function ShootingDetail({
                 <Ellipsis />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                  <Pencil />
+                  Modifier
+                </DropdownMenuItem>
                 {shooting.archived ? null : (
                   <DropdownMenuItem
                     disabled={archiving}
@@ -250,9 +331,13 @@ export function ShootingDetail({
                 }
                 uploading={uploadingOwnerId === owner.id}
                 uploadLocked={uploadingOwnerId !== null}
-                onAddDog={(name) => addDog(owner.email, name)}
+                deletingPhotos={deletingOwnerId === owner.id}
+                onAddDog={(name) => addDog(owner.id, name)}
                 onRemoveDog={(name) => void onRemoveDog(owner.id, name)}
                 onUpload={(files) => void onUpload(owner.id, files)}
+                onDeletePhotos={(photoIds) =>
+                  void onDeletePhotos(owner.id, photoIds)
+                }
               />
             ))}
           </ul>
@@ -271,7 +356,7 @@ export function ShootingDetail({
               const data = new FormData(form);
               setAddingNew(true);
               try {
-                const ok = await addDog(
+                const ok = await addOwner(
                   String(data.get("email") ?? ""),
                   String(data.get("name") ?? ""),
                 );
@@ -342,6 +427,82 @@ export function ShootingDetail({
           </p>
         ) : null}
       </section>
+
+      <Dialog
+        open={editOpen}
+        onOpenChange={(open) => {
+          if (!open && !saving) setEditOpen(false);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Modifier le shooting</DialogTitle>
+            <DialogDescription>
+              Mets à jour le nom et la date de la séance.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            id={`edit-shooting-${shooting.id}`}
+            className="flex flex-col gap-3"
+            onSubmit={(event) => void onSaveEdit(event)}
+          >
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor={`edit-name-${shooting.id}`}
+                className="text-sm font-medium"
+              >
+                Nom
+              </label>
+              <input
+                id={`edit-name-${shooting.id}`}
+                name="name"
+                type="text"
+                required
+                maxLength={80}
+                defaultValue={shooting.name}
+                key={`${shooting.id}-name-${editOpen}`}
+                placeholder="Séance du dimanche"
+                className={fieldClass}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label
+                htmlFor={`edit-shot-on-${shooting.id}`}
+                className="text-sm font-medium"
+              >
+                Date
+              </label>
+              <input
+                id={`edit-shot-on-${shooting.id}`}
+                name="shotOn"
+                type="date"
+                required
+                defaultValue={shooting.shotOn}
+                key={`${shooting.id}-date-${editOpen}`}
+                className={fieldClass}
+              />
+            </div>
+          </form>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className={quietCta}
+              disabled={saving}
+              onClick={() => setEditOpen(false)}
+            >
+              Fermer
+            </Button>
+            <Button
+              type="submit"
+              form={`edit-shooting-${shooting.id}`}
+              disabled={saving}
+            >
+              {saving ? "Modification…" : "Modifier"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

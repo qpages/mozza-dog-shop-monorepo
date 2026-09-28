@@ -12,6 +12,7 @@ function Toaster({ ...props }: ToasterProps) {
   return (
     <Sonner
       theme="light"
+      richColors
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4" />,
@@ -25,12 +26,20 @@ function Toaster({ ...props }: ToasterProps) {
           "--normal-bg": "var(--popover)",
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
+          "--success-bg": "var(--popover)",
+          "--success-text": "var(--popover-foreground)",
+          "--success-border": "var(--border)",
+          "--error-bg": "color-mix(in oklab, var(--destructive) 12%, white)",
+          "--error-text": "var(--destructive)",
+          "--error-border":
+            "color-mix(in oklab, var(--destructive) 35%, transparent)",
           "--border-radius": "var(--radius)",
         } as CSSProperties
       }
       toastOptions={{
         classNames: {
           toast: "cn-toast",
+          error: "cn-toast-error",
         },
       }}
       {...props}

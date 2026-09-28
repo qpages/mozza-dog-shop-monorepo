@@ -1,5 +1,13 @@
 import { apiUrl } from "@/lib/api";
 
+export type Photo = {
+  id: string;
+  url: string;
+  byteSize: number;
+  contentType: string;
+  uploadedAt: string;
+};
+
 export type Shooting = {
   id: string;
   shotOn: string;
@@ -10,6 +18,7 @@ export type Shooting = {
     email: string;
     photoCount: number;
     dogs: string[];
+    photos: Photo[];
   }[];
 };
 
@@ -76,6 +85,19 @@ export async function createShooting(input: {
   return body.id;
 }
 
+export async function updateShooting(
+  id: string,
+  input: { shotOn: string; name: string },
+): Promise<boolean> {
+  const response = await fetch(`${apiUrl}/admin/shootings/${id}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return response.ok;
+}
+
 export async function setShootingArchived(
   id: string,
   archived: boolean,
@@ -95,15 +117,33 @@ export async function deleteShooting(id: string): Promise<boolean> {
   return response.ok;
 }
 
-export async function addDogs(
+export async function addShootingOwner(
   shootingId: string,
   input: { email: string; names: string[] },
 ): Promise<{ added: string[]; skipped: string[] } | "duplicate" | "error"> {
-  const response = await fetch(`${apiUrl}/admin/shootings/${shootingId}/dogs`, {
+  const response = await fetch(
+    `${apiUrl}/admin/shootings/${shootingId}/owners`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
+  if (response.status === 409) return "duplicate";
+  if (!response.ok) return "error";
+  return (await response.json()) as { added: string[]; skipped: string[] };
+}
+
+export async function addDogs(
+  ownerId: string,
+  names: string[],
+): Promise<{ added: string[]; skipped: string[] } | "duplicate" | "error"> {
+  const response = await fetch(`${apiUrl}/admin/owners/${ownerId}/dogs`, {
     method: "POST",
     credentials: "include",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(input),
+    body: JSON.stringify({ names }),
   });
   if (response.status === 409) return "duplicate";
   if (!response.ok) return "error";
@@ -111,17 +151,31 @@ export async function addDogs(
 }
 
 export async function removeDog(
-  shootingId: string,
   ownerId: string,
   name: string,
 ): Promise<"ok" | "error"> {
+  const response = await fetch(`${apiUrl}/admin/owners/${ownerId}/dogs`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) return "error";
+  return "ok";
+}
+
+export async function deletePhotos(
+  shootingId: string,
+  ownerId: string,
+  photoIds: string[],
+): Promise<"ok" | "error"> {
   const response = await fetch(
-    `${apiUrl}/admin/shootings/${shootingId}/owners/${ownerId}/dogs`,
+    `${apiUrl}/admin/shootings/${shootingId}/owners/${ownerId}/photos`,
     {
       method: "DELETE",
       credentials: "include",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ ids: photoIds }),
     },
   );
   if (!response.ok) return "error";

@@ -79,7 +79,7 @@ export function AdminApp({ defaultEmail = "", defaultPassword = "" }: Props) {
 
       {email ? <ShootingsScreen /> : null}
 
-      <Toaster position="top-center" />
+      <Toaster position="bottom-right" />
     </div>
   );
 }

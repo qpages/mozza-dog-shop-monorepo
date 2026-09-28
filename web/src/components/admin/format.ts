@@ -17,6 +17,31 @@ export function photoLabel(count: number) {
   return count === 1 ? "1 photo" : `${count} photos`;
 }
 
+export function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} o`;
+  const units = ["Ko", "Mo", "Go"];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  const rounded = value >= 10 ? Math.round(value) : Math.round(value * 10) / 10;
+  return `${rounded.toLocaleString("fr-FR")} ${units[unit]}`;
+}
+
+export function formatMime(contentType: string) {
+  const subtype = contentType.split("/")[1] ?? contentType;
+  return subtype.toUpperCase();
+}
+
+export function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString("fr-FR", {
+    dateStyle: "long",
+    timeStyle: "short",
+  });
+}
+
 function participantLabel(count: number) {
   if (count === 0) return "aucun participant";
   return count === 1 ? "1 participant" : `${count} participants`;
