@@ -8,7 +8,10 @@ import {
 } from "@/components/admin/photo-strip";
 import { quietCta, subtleText } from "@/components/admin/styles";
 import { Button, buttonVariants } from "@/components/ui/button";
-import type { Shooting } from "@/lib/admin-client";
+import {
+  PHOTO_UPLOAD_REQUIRES_DOG_MESSAGE,
+  type Shooting,
+} from "@/lib/admin-client";
 
 type Owner = Shooting["owners"][number];
 
@@ -51,6 +54,7 @@ export function OwnerRow({
   const selectEntryRef = useRef<HTMLButtonElement>(null);
   const stripRef = useRef<PhotoStripHandle>(null);
   const photos = photoLabel(owner.photoCount);
+  const canImportPhotos = owner.dogs.length > 0;
 
   return (
     <li className="flex flex-col gap-4 px-5 py-4">
@@ -143,6 +147,11 @@ export function OwnerRow({
             )}
           </ul>
           <p className={cn("truncate text-sm", subtleText)}>{owner.email}</p>
+          {!archived && !canImportPhotos ? (
+            <p className={cn("max-w-prose text-sm", subtleText)}>
+              {PHOTO_UPLOAD_REQUIRES_DOG_MESSAGE}
+            </p>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
           <span className={cn("text-sm font-normal tabular-nums", subtleText)}>
@@ -151,12 +160,19 @@ export function OwnerRow({
           {archived ? null : (
             <div className="flex items-center gap-2">
               <label
-                aria-disabled={uploadLocked || selectMode || undefined}
+                aria-disabled={
+                  uploadLocked || selectMode || !canImportPhotos || undefined
+                }
+                title={
+                  !canImportPhotos
+                    ? PHOTO_UPLOAD_REQUIRES_DOG_MESSAGE
+                    : undefined
+                }
                 className={cn(
                   buttonVariants({ variant: "outline" }),
                   quietCta,
                   "has-focus-visible:ring-3 has-focus-visible:ring-canvas/25 cursor-pointer",
-                  (uploadLocked || selectMode) &&
+                  (uploadLocked || selectMode || !canImportPhotos) &&
                     "border-canvas/30 bg-canvas/8 text-canvas/55 hover:bg-canvas/8 hover:text-canvas/55 pointer-events-none cursor-not-allowed",
                 )}
               >
@@ -172,7 +188,7 @@ export function OwnerRow({
                   accept="image/jpeg,image/png,image/webp"
                   multiple
                   className="sr-only"
-                  disabled={uploadLocked || selectMode}
+                  disabled={uploadLocked || selectMode || !canImportPhotos}
                   onChange={(event) => {
                     const input = event.currentTarget;
                     const files = input.files ? [...input.files] : [];

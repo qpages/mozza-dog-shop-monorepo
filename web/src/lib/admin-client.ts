@@ -3,6 +3,7 @@ import { apiUrl } from "@/lib/api";
 export type Photo = {
   id: string;
   url: string;
+  title: string;
   byteSize: number;
   contentType: string;
   uploadedAt: string;
@@ -24,6 +25,21 @@ export type Shooting = {
 
 const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+
+export const PHOTO_UPLOAD_REQUIRES_DOG_MESSAGE =
+  "Ajoute au moins un chien à ce maître avant d'importer des photos.";
+
+async function apiErrorMessage(response: Response): Promise<string | null> {
+  try {
+    const body = (await response.json()) as { message?: string };
+    if (typeof body.message === "string" && body.message.trim()) {
+      return body.message;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
 
 export async function getSession(): Promise<string | null> {
   try {
@@ -117,9 +133,37 @@ export async function deleteShooting(id: string): Promise<boolean> {
   return response.ok;
 }
 
+export type OwnerSuggestion = {
+  id: string;
+  email: string;
+  dogs: string[];
+};
+
+export async function searchOwners(
+  query: string,
+  signal?: AbortSignal,
+): Promise<OwnerSuggestion[] | null> {
+  const params = new URLSearchParams();
+  if (query) params.set("q", query);
+  try {
+    const response = await fetch(`${apiUrl}/admin/owners?${params}`, {
+      credentials: "include",
+      signal,
+    });
+    if (!response.ok) return null;
+    const body = (await response.json()) as { owners: OwnerSuggestion[] };
+    return body.owners;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return null;
+    }
+    return null;
+  }
+}
+
 export async function addShootingOwner(
   shootingId: string,
-  input: { email: string; names: string[] },
+  input: { email: string; names?: string[] },
 ): Promise<{ added: string[]; skipped: string[] } | "duplicate" | "error"> {
   const response = await fetch(
     `${apiUrl}/admin/shootings/${shootingId}/owners`,
@@ -127,7 +171,7 @@ export async function addShootingOwner(
       method: "POST",
       credentials: "include",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(input),
+      body: JSON.stringify({ email: input.email, names: input.names ?? [] }),
     },
   );
   if (response.status === 409) return "duplicate";
@@ -219,10 +263,11 @@ export async function uploadPhotos(
       },
     );
     if (!presign.ok) {
-      failures.push({
-        name: file.name,
-        message: `Envoi impossible pour ${file.name}.`,
-      });
+      const message =
+        (await apiErrorMessage(presign)) ??
+        `Envoi impossible pour ${file.name}.`;
+      failures.push({ name: file.name, message });
+      if (presign.status === 400) break;
       continue;
     }
     const signed = (await presign.json()) as {

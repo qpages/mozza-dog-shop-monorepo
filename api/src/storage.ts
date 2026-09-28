@@ -7,6 +7,7 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import type { Readable } from "node:stream";
 import fp from "fastify-plugin";
 
 const PUT_TTL_SECONDS = 10 * 60;
@@ -19,10 +20,14 @@ export type ObjectStorage = {
     contentType: string;
     byteSize: number;
   }) => Promise<string>;
-  presignGet: (key: string) => Promise<string>;
+  presignGet: (
+    key: string,
+    options?: { downloadName?: string },
+  ) => Promise<string>;
   head: (
     key: string,
   ) => Promise<{ byteSize: number; contentType: string | undefined } | null>;
+  getStream: (key: string) => Promise<Readable>;
   removeMany: (keys: string[]) => Promise<void>;
 };
 
@@ -114,10 +119,20 @@ export default fp(
           }),
           { expiresIn: PUT_TTL_SECONDS },
         ),
-      presignGet: (key) =>
+      presignGet: (key, options) =>
         getSignedUrl(
           client,
-          new GetObjectCommand({ Bucket: R2_BUCKET, Key: key }),
+          new GetObjectCommand({
+            Bucket: R2_BUCKET,
+            Key: key,
+            ...(options?.downloadName
+              ? {
+                  ResponseContentDisposition: contentDispositionAttachment(
+                    options.downloadName,
+                  ),
+                }
+              : {}),
+          }),
           { expiresIn: GET_TTL_SECONDS },
         ),
       head: async (key) => {
@@ -133,6 +148,15 @@ export default fp(
           if (isNotFound(error)) return null;
           throw error;
         }
+      },
+      getStream: async (key) => {
+        const result = await client.send(
+          new GetObjectCommand({ Bucket: R2_BUCKET, Key: key }),
+        );
+        if (!result.Body) {
+          throw new Error(`empty object body: ${key}`);
+        }
+        return result.Body as Readable;
       },
       removeMany: async (keys) => {
         for (let i = 0; i < keys.length; i += DELETE_BATCH_SIZE) {
@@ -154,3 +178,8 @@ export default fp(
   },
   { name: "storage" },
 );
+
+export function contentDispositionAttachment(filename: string) {
+  const ascii = filename.replace(/[^\x20-\x7E]/g, "_").replace(/["\\]/g, "_");
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+}

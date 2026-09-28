@@ -1,8 +1,15 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { ZipArchive } from "archiver";
+import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { randomUUID } from "node:crypto";
+import { contentDispositionAttachment } from "../storage.js";
 import { requireStorage } from "../types.js";
 import { normalizeEmail } from "./email.js";
+import {
+  photoDownloadFilename,
+  photoTitle,
+  shootingArchiveFilename,
+} from "./photo-naming.js";
 import {
   MAX_PHOTO_BYTES,
   owners,
@@ -12,10 +19,19 @@ import {
   shootings,
 } from "./schema.js";
 
+const PHOTO_UPLOAD_REQUIRES_DOG_MESSAGE =
+  "Ajoute au moins un chien à ce maître avant d'importer des photos.";
+
 const contentTypeSchema = { type: "string", enum: [...PHOTO_CONTENT_TYPES] };
 const dogNamesSchema = {
   type: "array",
   minItems: 1,
+  maxItems: 8,
+  items: { type: "string", minLength: 1, maxLength: 80 },
+};
+
+const optionalDogNamesSchema = {
+  type: "array",
   maxItems: 8,
   items: { type: "string", minLength: 1, maxLength: 80 },
 };
@@ -53,7 +69,12 @@ export const shootingRoutes: FastifyPluginAsync = async (app) => {
       const owner = await app.db.query.owners.findFirst({
         where: eq(owners.email, email),
         with: {
-          shootingOwners: { with: { shooting: true, photos: true } },
+          shootingOwners: {
+            with: {
+              shooting: true,
+              photos: { orderBy: [desc(photos.createdAt)] },
+            },
+          },
         },
       });
       const rows =
@@ -70,6 +91,86 @@ export const shootingRoutes: FastifyPluginAsync = async (app) => {
       }
 
       return { email, shootings: await groupByShooting(app.storage, rows) };
+    },
+  );
+
+  app.get<{ Querystring: { email: string; shooting: string } }>(
+    "/photos/archive",
+    {
+      schema: {
+        querystring: {
+          type: "object",
+          required: ["email", "shooting"],
+          additionalProperties: false,
+          properties: {
+            email: { type: "string", format: "email", maxLength: 320 },
+            shooting: { type: "string", format: "uuid" },
+          },
+        },
+      },
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: "1 minute",
+        },
+      },
+    },
+    async (request, reply) => {
+      const email = normalizeEmail(request.query.email);
+      const shootingId = request.query.shooting;
+      const owner = await app.db.query.owners.findFirst({
+        where: eq(owners.email, email),
+        with: {
+          shootingOwners: {
+            where: eq(shootingOwners.shootingId, shootingId),
+            with: {
+              shooting: true,
+              photos: { orderBy: [desc(photos.createdAt)] },
+            },
+          },
+        },
+      });
+      const sheet = owner?.shootingOwners[0];
+      if (!sheet || sheet.shooting.archivedAt || sheet.photos.length === 0) {
+        throw app.httpErrors.notFound("photos not found");
+      }
+
+      const storage = requireStorage(app);
+      const zipName = shootingArchiveFilename(sheet.shooting.name);
+      const archive = new ZipArchive({ store: true });
+      archive.on("warning", (error) => {
+        request.log.warn({ err: error }, "zip archive warning");
+      });
+      archive.on("error", (error) => {
+        request.log.error({ err: error }, "zip archive failed");
+        archive.destroy();
+      });
+
+      void (async () => {
+        try {
+          for (const [index, photo] of sheet.photos.entries()) {
+            const body = await storage.getStream(photo.objectKey);
+            archive.append(body, {
+              name: photoDownloadFilename({
+                shootingName: sheet.shooting.name,
+                dogNames: owner.dogNames,
+                index,
+                contentType: photo.contentType,
+              }),
+            });
+          }
+          await archive.finalize();
+        } catch (error) {
+          request.log.error({ err: error }, "zip archive failed");
+          archive.destroy(error instanceof Error ? error : undefined);
+        }
+      })();
+
+      return reply
+        .header("Content-Type", "application/zip")
+        .header("Cache-Control", "no-store")
+        .header("Content-Disposition", contentDispositionAttachment(zipName))
+        .send(archive);
     },
   );
 };
@@ -102,9 +203,14 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
               photoCount: sheet.photos.length,
               dogs: sheet.owner.dogNames,
               photos: await Promise.all(
-                sheet.photos.map(async (photo) => ({
+                sheet.photos.map(async (photo, index) => ({
                   id: photo.id,
                   url: storage ? await storage.presignGet(photo.objectKey) : "",
+                  title: photoTitle({
+                    shootingName: shooting.name,
+                    dogNames: sheet.owner.dogNames,
+                    index,
+                  }),
                   byteSize: photo.byteSize,
                   contentType: photo.contentType,
                   uploadedAt: photo.createdAt.toISOString(),
@@ -241,9 +347,55 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
     },
   );
 
+  app.get<{ Querystring: { q?: string } }>(
+    "/owners",
+    {
+      schema: {
+        querystring: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            q: { type: "string", maxLength: 320 },
+          },
+        },
+      },
+    },
+    async (request) => {
+      const q = request.query.q?.trim().toLowerCase() ?? "";
+      const rows = await app.db
+        .select({
+          id: owners.id,
+          email: owners.email,
+          dogNames: owners.dogNames,
+        })
+        .from(owners)
+        .where(
+          q
+            ? or(
+                ilike(owners.email, likeContains(q)),
+                sql`exists (
+                  select 1 from unnest(${owners.dogNames}) as dog_name
+                  where dog_name ilike ${likeContains(q)}
+                )`,
+              )
+            : undefined,
+        )
+        .orderBy(q ? asc(owners.email) : desc(owners.createdAt))
+        .limit(8);
+
+      return {
+        owners: rows.map((row) => ({
+          id: row.id,
+          email: row.email,
+          dogs: row.dogNames,
+        })),
+      };
+    },
+  );
+
   app.post<{
     Params: { shootingId: string };
-    Body: { email: string; names: string[] };
+    Body: { email: string; names?: string[] };
   }>(
     "/shootings/:shootingId/owners",
     {
@@ -251,11 +403,11 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
         params: uuidParams("shootingId"),
         body: {
           type: "object",
-          required: ["email", "names"],
+          required: ["email"],
           additionalProperties: false,
           properties: {
             email: { type: "string", format: "email", maxLength: 320 },
-            names: dogNamesSchema,
+            names: optionalDogNamesSchema,
           },
         },
       },
@@ -270,7 +422,7 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
       }
 
       const email = normalizeEmail(request.body.email);
-      const incoming = uniqueNames(request.body.names);
+      const incoming = uniqueNames(request.body.names ?? []);
       const result = await app.db.transaction(async (tx) => {
         const existingOwner = await tx.query.owners.findFirst({
           where: eq(owners.email, email),
@@ -316,7 +468,11 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (result.added.length === 0 && !result.linked) {
-        throw app.httpErrors.conflict("dog already exists for this owner");
+        throw app.httpErrors.conflict(
+          incoming.length === 0
+            ? "owner already on this shooting"
+            : "dog already exists for this owner",
+        );
       }
       return reply.code(201).send({
         added: result.added,
@@ -419,11 +575,12 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
     },
     async (request) => {
       const storage = requireStorage(app);
-      const sheet = await findSheet(
+      const sheet = await findSheetWithOwner(
         app,
         request.params.shootingId,
         request.params.ownerId,
       );
+      assertCanUploadPhotos(app, sheet.owner.dogNames);
 
       const photoId = randomUUID();
       const objectKey = `shootings/${sheet.shootingId}/owners/${sheet.ownerId}/${photoId}`;
@@ -473,11 +630,12 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
     },
     async (request, reply) => {
       const storage = requireStorage(app);
-      const sheet = await findSheet(
+      const sheet = await findSheetWithOwner(
         app,
         request.params.shootingId,
         request.params.ownerId,
       );
+      assertCanUploadPhotos(app, sheet.owner.dogNames);
 
       const { objectKey, contentType, byteSize } = request.body;
       const prefix = `shootings/${sheet.shootingId}/owners/${sheet.ownerId}/`;
@@ -582,6 +740,10 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
   );
 };
 
+function likeContains(value: string) {
+  return `%${value.replace(/[%_\\]/g, "\\$&")}%`;
+}
+
 function uuidParams(...names: string[]) {
   return {
     type: "object",
@@ -634,8 +796,35 @@ async function findSheet(
   return sheet;
 }
 
+async function findSheetWithOwner(
+  app: FastifyInstance,
+  shootingId: string,
+  ownerId: string,
+) {
+  const sheet = await app.db.query.shootingOwners.findFirst({
+    where: and(
+      eq(shootingOwners.shootingId, shootingId),
+      eq(shootingOwners.ownerId, ownerId),
+    ),
+    with: { owner: true },
+  });
+  if (!sheet) throw app.httpErrors.notFound("owner not found");
+  return sheet;
+}
+
+function assertCanUploadPhotos(app: FastifyInstance, dogNames: string[]) {
+  if (dogNames.length === 0) {
+    throw app.httpErrors.badRequest(PHOTO_UPLOAD_REQUIRES_DOG_MESSAGE);
+  }
+}
+
 async function groupByShooting(
-  storage: { presignGet: (key: string) => Promise<string> } | null,
+  storage: {
+    presignGet: (
+      key: string,
+      options?: { downloadName?: string },
+    ) => Promise<string>;
+  } | null,
   rows: SheetRow[],
 ) {
   const byShooting = new Map<
@@ -648,8 +837,11 @@ async function groupByShooting(
       photos: {
         id: string;
         url: string;
+        downloadUrl: string;
+        title: string;
         byteSize: number;
         contentType: string;
+        uploadedAt: string;
       }[];
     }
   >();
@@ -657,12 +849,30 @@ async function groupByShooting(
   for (const sheet of rows) {
     if (sheet.shooting.archivedAt) continue;
     const listed = [];
-    for (const photo of sheet.photos) {
+    for (const [index, photo] of sheet.photos.entries()) {
+      const naming = {
+        shootingName: sheet.shooting.name,
+        dogNames: sheet.owner.dogNames,
+        index,
+      };
+      const downloadName = photoDownloadFilename({
+        ...naming,
+        contentType: photo.contentType,
+      });
+      const [url, downloadUrl] = storage
+        ? await Promise.all([
+            storage.presignGet(photo.objectKey),
+            storage.presignGet(photo.objectKey, { downloadName }),
+          ])
+        : ["", ""];
       listed.push({
         id: photo.id,
-        url: storage ? await storage.presignGet(photo.objectKey) : "",
+        url,
+        downloadUrl,
+        title: photoTitle(naming),
         byteSize: photo.byteSize,
         contentType: photo.contentType,
+        uploadedAt: photo.createdAt.toISOString(),
       });
     }
 

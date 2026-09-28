@@ -11,6 +11,7 @@ import {
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { ShootingMeta } from "@/components/admin/shooting-meta";
+import { OwnerEmailField } from "@/components/admin/owner-email-field";
 import { OwnerRow } from "@/components/admin/owner-row";
 import {
   fieldClass,
@@ -39,6 +40,7 @@ import {
   deletePhotos,
   removeDog,
   updateShooting,
+  PHOTO_UPLOAD_REQUIRES_DOG_MESSAGE,
   uploadPhotos,
   type Shooting,
 } from "@/lib/admin-client";
@@ -65,6 +67,8 @@ export function ShootingDetail({
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addingNew, setAddingNew] = useState(false);
+  const [ownerEmail, setOwnerEmail] = useState("");
+  const emailRef = useRef<HTMLInputElement>(null);
   const [removingKey, setRemovingKey] = useState<string | null>(null);
   const [uploadingOwnerId, setUploadingOwnerId] = useState<string | null>(null);
   const [deletingOwnerId, setDeletingOwnerId] = useState<string | null>(null);
@@ -104,11 +108,24 @@ export function ShootingDetail({
     }
   }
 
-  function addOwner(email: string, name: string) {
-    const trimmed = name.trim();
-    return saveDog(trimmed, () =>
-      addShootingOwner(shooting.id, { email, names: [trimmed] }),
-    );
+  async function addOwner(email: string) {
+    try {
+      const result = await addShootingOwner(shooting.id, { email });
+      if (result === "duplicate") {
+        toast.error("Ce maître est déjà sur ce shooting.");
+        return false;
+      }
+      if (result === "error") {
+        toast.error("Impossible d'ajouter le maître.");
+        return false;
+      }
+      toast.success("Maître ajouté.");
+      onChanged();
+      return true;
+    } catch {
+      toast.error("Impossible d'ajouter le maître.");
+      return false;
+    }
   }
 
   function addDog(ownerId: string, name: string) {
@@ -136,6 +153,11 @@ export function ShootingDetail({
 
   async function onUpload(ownerId: string, files: File[]) {
     if (uploadingOwnerId) return;
+    const owner = shooting.owners.find((row) => row.id === ownerId);
+    if (!owner || owner.dogs.length === 0) {
+      toast.error(PHOTO_UPLOAD_REQUIRES_DOG_MESSAGE);
+      return;
+    }
     setUploadingOwnerId(ownerId);
     try {
       const { added, failures } = await uploadPhotos(
@@ -243,7 +265,7 @@ export function ShootingDetail({
                 onClick={() => setFormOpen(true)}
               >
                 <Plus />
-                Ajouter un chien
+                Ajouter un maître
               </Button>
             )}
             <DropdownMenu>
@@ -308,10 +330,10 @@ export function ShootingDetail({
 
         {empty && !shooting.archived ? (
           <div className="px-5 pt-5">
-            <p className="font-medium">Aucun chien pour l'instant</p>
+            <p className="font-medium">Aucun maître pour l'instant</p>
             <p className={cn("mt-1 max-w-prose text-sm", subtleText)}>
-              Ajoute chaque chien avec l'e-mail de son maître. Il retrouvera ses
-              photos avec cet e-mail.
+              Ajoute un maître par e-mail, puis ses chiens depuis sa ligne. Il
+              retrouvera ses photos avec cet e-mail.
             </p>
           </div>
         ) : null}
@@ -352,55 +374,38 @@ export function ShootingDetail({
             onSubmit={async (event) => {
               event.preventDefault();
               if (addingNew) return;
-              const form = event.currentTarget;
-              const data = new FormData(form);
+              const email = ownerEmail.trim();
+              if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                toast.error("Choisis un maître ou saisis son e-mail.");
+                return;
+              }
               setAddingNew(true);
               try {
-                const ok = await addOwner(
-                  String(data.get("email") ?? ""),
-                  String(data.get("name") ?? ""),
-                );
+                const ok = await addOwner(email);
                 if (!ok) return;
                 setFormOpen(true);
-                form.reset();
-                (form.elements.namedItem("name") as HTMLInputElement).focus();
+                setOwnerEmail("");
+                emailRef.current?.focus();
               } finally {
                 setAddingNew(false);
               }
             }}
           >
-            <div className="flex flex-1 flex-col gap-1.5">
-              <label
-                htmlFor={`new-dog-${shooting.id}`}
-                className="text-sm font-medium"
-              >
-                Chien
-              </label>
-              <input
-                id={`new-dog-${shooting.id}`}
-                name="name"
-                type="text"
-                required
-                maxLength={80}
-                autoFocus={!empty}
-                placeholder="Médor"
-                className={fieldClass}
-              />
-            </div>
-            <div className="flex flex-[1.4] flex-col gap-1.5">
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
               <label
                 htmlFor={`new-email-${shooting.id}`}
                 className="text-sm font-medium"
               >
                 E-mail du maître
               </label>
-              <input
+              <OwnerEmailField
                 id={`new-email-${shooting.id}`}
-                name="email"
-                type="email"
-                required
-                placeholder="maitre@email.com"
-                className={fieldClass}
+                value={ownerEmail}
+                onValueChange={setOwnerEmail}
+                excludeEmails={shooting.owners.map((owner) => owner.email)}
+                disabled={addingNew}
+                autoFocus={!empty}
+                inputRef={emailRef}
               />
             </div>
             <div className="flex gap-2">
@@ -412,7 +417,10 @@ export function ShootingDetail({
                   type="button"
                   variant="ghost"
                   size="lg"
-                  onClick={() => setFormOpen(false)}
+                  onClick={() => {
+                    setOwnerEmail("");
+                    setFormOpen(false);
+                  }}
                 >
                   Fermer
                 </Button>

@@ -1,0 +1,52 @@
+.photo-prints {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 11rem));
+  justify-content: center;
+  width: min(100% - 2rem, 52rem);
+  flex-shrink: 0;
+  margin-inline: auto;
+  padding-block: 0.75rem 1.5rem;
+}
+
+.photo-print {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  margin-inline: -0.35rem;
+  background: var(--paper);
+  padding: 0.35rem 0.35rem 0.7rem;
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--elevation-paper);
+  transform: rotate(var(--r)) translateY(var(--y));
+  transition: transform 350ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.photo-print-frame {
+  display: block;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+
+.photo-print img {
+  display: block;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+}
+
+.photo-print:last-child img {
+  object-position: 24% center;
+}
+
+@media (hover: hover) {
+  .photo-print:hover {
+    transform: rotate(calc(var(--r) * 0.15)) translateY(var(--y));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo-print {
+    transition: none;
+  }
+}
