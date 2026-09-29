@@ -9,6 +9,7 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { Readable } from "node:stream";
 import fp from "fastify-plugin";
+import { parseWebOrigins } from "./origins.js";
 
 const PUT_TTL_SECONDS = 10 * 60;
 const GET_TTL_SECONDS = 15 * 60;
@@ -92,7 +93,7 @@ export default fp(
           CORSConfiguration: {
             CORSRules: [
               {
-                AllowedOrigins: [app.config.WEB_ORIGIN],
+                AllowedOrigins: parseWebOrigins(app.config.WEB_ORIGIN),
                 AllowedMethods: ["GET", "PUT", "HEAD"],
                 AllowedHeaders: ["*"],
                 ExposeHeaders: ["ETag"],

@@ -1,4 +1,4 @@
-import { apiUrl } from "@/lib/api";
+import { resolveApiUrl } from "@/lib/api";
 
 export type OwnerPhoto = {
   id: string;
@@ -23,7 +23,7 @@ export async function fetchOwnerGallery(
 ): Promise<OwnerShooting[] | null> {
   try {
     const response = await fetch(
-      `${apiUrl}/photos?email=${encodeURIComponent(email)}`,
+      `${resolveApiUrl()}/photos?email=${encodeURIComponent(email)}`,
     );
     if (!response.ok) return null;
     const body = (await response.json()) as { shootings: OwnerShooting[] };
@@ -44,7 +44,7 @@ export function downloadPhoto(photo: OwnerPhoto) {
 }
 
 export function shootingArchiveUrl(email: string, shootingId: string) {
-  return `${apiUrl}/photos/archive?email=${encodeURIComponent(email)}&shooting=${encodeURIComponent(shootingId)}`;
+  return `${resolveApiUrl()}/photos/archive?email=${encodeURIComponent(email)}&shooting=${encodeURIComponent(shootingId)}`;
 }
 
 export function viewPhoto(photo: OwnerPhoto) {

@@ -8,6 +8,7 @@ import Fastify from "fastify";
 import { fileURLToPath } from "node:url";
 import { adminRoutes, protectedAdminRoutes } from "./admin/http.js";
 import dbPlugin from "./db.js";
+import { createCorsOriginChecker } from "./origins.js";
 import { shootingRoutes } from "./shooting/http.js";
 import storagePlugin from "./storage.js";
 import "./types.js";
@@ -19,6 +20,8 @@ const envSchema = {
   properties: {
     DATABASE_URL: { type: "string", minLength: 1 },
     JWT_SECRET: { type: "string", minLength: 16 },
+    // Comma-separated origins. Prod: one exact site URL. Dev: localhost is enough;
+    // private LAN origins (192.168.x, 10.x, 127.x, …) are also accepted when NODE_ENV≠production.
     WEB_ORIGIN: { type: "string", default: "http://localhost:4321" },
     PORT: { type: "integer", default: 8787 },
     HOST: { type: "string", default: "0.0.0.0" },
@@ -59,7 +62,7 @@ export async function buildApp() {
   });
   await app.register(sensible);
   await app.register(cors, {
-    origin: app.config.WEB_ORIGIN,
+    origin: createCorsOriginChecker(app.config.WEB_ORIGIN, app.config.NODE_ENV),
     credentials: true,
     methods: ["GET", "HEAD", "POST", "PATCH", "DELETE"],
   });
