@@ -184,6 +184,7 @@ export function ShootingDetail({
       return;
     }
     setUploadingOwnerId(ownerId);
+    const uploadToast = toast.loading("Téléchargement en cours…");
     try {
       const { added, failures } = await uploadPhotos(
         shooting.id,
@@ -196,11 +197,14 @@ export function ShootingDetail({
       if (added > 0) {
         toast.success(
           added === 1 ? "1 photo ajoutée." : `${added} photos ajoutées.`,
+          { id: uploadToast },
         );
         onChanged();
+      } else {
+        toast.dismiss(uploadToast);
       }
     } catch {
-      toast.error("Impossible d'ajouter la/les photos.");
+      toast.error("Impossible d'ajouter la/les photos.", { id: uploadToast });
     } finally {
       setUploadingOwnerId(null);
     }

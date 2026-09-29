@@ -25,7 +25,7 @@ export type Shooting = {
 };
 
 const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
-const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
 
 export const PHOTO_UPLOAD_REQUIRES_DOG_MESSAGE =
   "Ajoute au moins un chien à ce participant avant d'importer des photos.";
@@ -282,7 +282,7 @@ export async function uploadPhotos(
     if (file.size < 1 || file.size > MAX_PHOTO_BYTES) {
       failures.push({
         name: file.name,
-        message: `${file.name} dépasse 10 Mo.`,
+        message: `${file.name} dépasse 15 Mo.`,
       });
       continue;
     }

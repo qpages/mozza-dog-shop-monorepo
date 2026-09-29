@@ -50,6 +50,13 @@
       "when": 1790726400000,
       "tag": "0006_photo_thumbnail",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790733600000,
+      "tag": "0007_photo_byte_size_15mb",
+      "breakpoints": true
     }
   ]
 }

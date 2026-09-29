@@ -189,6 +189,7 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
       orderBy: [desc(shootings.shotOn)],
       with: {
         shootingOwners: {
+          orderBy: [desc(shootingOwners.createdAt)],
           with: {
             photos: { orderBy: [desc(photos.createdAt)] },
             owner: true,
