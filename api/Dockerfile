@@ -4,7 +4,8 @@
 # Coolify: Base Directory = / (repo root), Dockerfile = api/Dockerfile
 # Runtime: DATABASE_URL is injected by Coolify. Entry point applies pending
 # Drizzle SQL migrations then execs the API. Seed stays manual
-# (node dist/admin/seed.js).
+# (node dist/admin/seed.js). Thumbnails for photos already stored stay manual
+# (node dist/shooting/backfill-thumbnails.js).
 
 FROM node:22-alpine AS base
 RUN corepack enable && corepack prepare pnpm@10.15.1 --activate
@@ -32,6 +33,7 @@ RUN addgroup -S mozza && adduser -S mozza -G mozza
 COPY --from=build --chown=mozza:mozza /out ./
 COPY --from=build --chown=mozza:mozza /app/api/drizzle ./drizzle
 COPY --from=build --chmod=755 --chown=mozza:mozza /app/api/docker-entrypoint.sh ./docker-entrypoint.sh
+RUN node --input-type=module -e "await import('sharp')"
 
 USER mozza
 EXPOSE 8787

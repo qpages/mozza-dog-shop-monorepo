@@ -83,6 +83,7 @@ export const photos = pgTable(
       .notNull()
       .references(() => shootingOwners.id, { onDelete: "cascade" }),
     objectKey: text("object_key").notNull(),
+    thumbnailKey: text("thumbnail_key"),
     contentType: text("content_type").notNull(),
     byteSize: integer("byte_size").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -92,6 +93,11 @@ export const photos = pgTable(
   (table) => [
     index("photos_shooting_owner_id_idx").on(table.shootingOwnerId),
     uniqueIndex("photos_object_key_idx").on(table.objectKey),
+    uniqueIndex("photos_thumbnail_key_idx").on(table.thumbnailKey),
+    check(
+      "photos_thumbnail_key_shape",
+      sql`${table.thumbnailKey} IS NULL OR ${table.thumbnailKey} = ${table.objectKey} || '.thumb.webp'`,
+    ),
     check(
       "photos_byte_size",
       sql`${table.byteSize} > 0 AND ${table.byteSize} <= ${sql.raw(String(MAX_PHOTO_BYTES))}`,

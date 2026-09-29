@@ -3,6 +3,7 @@ import { resolveApiUrl } from "@/lib/api";
 export type Photo = {
   id: string;
   url: string;
+  thumbUrl: string;
   title: string;
   byteSize: number;
   contentType: string;

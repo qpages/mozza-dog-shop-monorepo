@@ -12,6 +12,11 @@ import {
   shootingArchiveFilename,
 } from "./photo-naming.js";
 import {
+  storedObjectKeys,
+  ThumbnailError,
+  writeThumbnail,
+} from "./thumbnail.js";
+import {
   MAX_PHOTO_BYTES,
   owners,
   PHOTO_CONTENT_TYPES,
@@ -204,18 +209,25 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
               photoCount: sheet.photos.length,
               dogs: sheet.owner.dogNames,
               photos: await Promise.all(
-                sheet.photos.map(async (photo, index) => ({
-                  id: photo.id,
-                  url: storage ? await storage.presignGet(photo.objectKey) : "",
-                  title: photoTitle({
-                    shootingName: shooting.name,
-                    dogNames: sheet.owner.dogNames,
-                    index,
-                  }),
-                  byteSize: photo.byteSize,
-                  contentType: photo.contentType,
-                  uploadedAt: photo.createdAt.toISOString(),
-                })),
+                sheet.photos.map(async (photo, index) => {
+                  const { url, thumbUrl } = await signedPhotoUrls(
+                    storage,
+                    photo,
+                  );
+                  return {
+                    id: photo.id,
+                    url,
+                    thumbUrl,
+                    title: photoTitle({
+                      shootingName: shooting.name,
+                      dogNames: sheet.owner.dogNames,
+                      index,
+                    }),
+                    byteSize: photo.byteSize,
+                    contentType: photo.contentType,
+                    uploadedAt: photo.createdAt.toISOString(),
+                  };
+                }),
               ),
             })),
           ),
@@ -305,7 +317,7 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
       if (!shooting) throw app.httpErrors.notFound("shooting not found");
 
       const keys = shooting.shootingOwners.flatMap((sheet) =>
-        sheet.photos.map((photo) => photo.objectKey),
+        sheet.photos.flatMap((photo) => storedObjectKeys(photo)),
       );
       // Remove from the object store first: if it fails we keep the database
       // rows so the photos stay listed instead of pointing at missing objects.
@@ -503,7 +515,7 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
       });
       if (!sheet) throw app.httpErrors.notFound("owner not found");
 
-      const keys = sheet.photos.map((photo) => photo.objectKey);
+      const keys = sheet.photos.flatMap((photo) => storedObjectKeys(photo));
       // Remove from the object store first: if it fails we keep the database
       // rows so the photos stay listed instead of pointing at missing objects.
       if (keys.length > 0) {
@@ -713,6 +725,18 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
         );
       }
 
+      let thumbnailKey: string;
+      try {
+        thumbnailKey = await writeThumbnail(storage, objectKey);
+      } catch (error) {
+        if (error instanceof ThumbnailError) {
+          throw withDetails(app.httpErrors.badRequest(error.message), {
+            objectKey,
+          });
+        }
+        throw error;
+      }
+
       const id = objectKey.slice(prefix.length);
       const [photo] = await app.db
         .insert(photos)
@@ -720,6 +744,7 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
           id,
           shootingOwnerId: sheet.id,
           objectKey,
+          thumbnailKey,
           contentType,
           byteSize,
         })
@@ -772,7 +797,9 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
 
       // Remove from the object store first: if it fails we keep the database
       // rows so the photos stay listed instead of pointing at missing objects.
-      await storage.removeMany(targets.map((photo) => photo.objectKey));
+      await storage.removeMany(
+        targets.flatMap((photo) => storedObjectKeys(photo)),
+      );
       await app.db.delete(photos).where(
         and(
           eq(photos.shootingOwnerId, sheet.id),
@@ -866,6 +893,29 @@ function assertCanUploadPhotos(app: FastifyInstance, dogNames: string[]) {
   }
 }
 
+async function signedPhotoUrls(
+  storage: {
+    presignGet: (
+      key: string,
+      options?: { downloadName?: string },
+    ) => Promise<string>;
+  } | null,
+  photo: { objectKey: string; thumbnailKey: string | null },
+  downloadName?: string,
+) {
+  if (!storage) return { url: "", thumbUrl: "", downloadUrl: "" };
+  const [url, downloadUrl, thumbSigned] = await Promise.all([
+    storage.presignGet(photo.objectKey),
+    downloadName
+      ? storage.presignGet(photo.objectKey, { downloadName })
+      : Promise.resolve(""),
+    photo.thumbnailKey
+      ? storage.presignGet(photo.thumbnailKey)
+      : Promise.resolve(""),
+  ]);
+  return { url, downloadUrl, thumbUrl: thumbSigned || url };
+}
+
 async function groupByShooting(
   storage: {
     presignGet: (
@@ -885,6 +935,7 @@ async function groupByShooting(
       photos: {
         id: string;
         url: string;
+        thumbUrl: string;
         downloadUrl: string;
         title: string;
         byteSize: number;
@@ -907,15 +958,15 @@ async function groupByShooting(
         ...naming,
         contentType: photo.contentType,
       });
-      const [url, downloadUrl] = storage
-        ? await Promise.all([
-            storage.presignGet(photo.objectKey),
-            storage.presignGet(photo.objectKey, { downloadName }),
-          ])
-        : ["", ""];
+      const { url, thumbUrl, downloadUrl } = await signedPhotoUrls(
+        storage,
+        photo,
+        downloadName,
+      );
       listed.push({
         id: photo.id,
         url,
+        thumbUrl,
         downloadUrl,
         title: photoTitle(naming),
         byteSize: photo.byteSize,

@@ -1,5 +1,6 @@
 import { Download, ExternalLink } from "lucide-react";
 import { useState } from "react";
+import { quietCta } from "@/components/admin/styles";
 import { PhotoLightbox } from "@/components/photo-lightbox";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,7 +26,7 @@ export function OwnerGallery({ shooting }: Props) {
         </p>
       ) : (
         <ul
-          className="flex flex-wrap gap-2"
+          className="photo-tiles flex flex-wrap gap-2"
           aria-label={`Photos de ${shooting.name}`}
         >
           {shooting.photos.map((photo, index) => (
@@ -37,13 +38,14 @@ export function OwnerGallery({ shooting }: Props) {
                 type="button"
                 aria-label="Agrandir la photo"
                 onClick={() => setViewingIndex(index)}
-                className="bg-ink/5 ring-ink/5 focus-visible:ring-canvas/50 relative block aspect-square w-full overflow-hidden rounded-lg outline-none ring-1 transition-shadow duration-200 focus-visible:ring-2"
+                className="photo-tile bg-ink/5 ring-ink/5 focus-visible:ring-canvas/50 relative block aspect-square w-full overflow-hidden rounded-lg outline-none ring-1 focus-visible:ring-2"
               >
                 <img
-                  src={photo.url}
+                  src={photo.thumbUrl || photo.url}
                   alt=""
                   loading="lazy"
-                  className="size-full object-cover transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-105"
+                  decoding="async"
+                  className="size-full object-cover"
                 />
               </button>
             </li>
@@ -64,6 +66,7 @@ export function OwnerGallery({ shooting }: Props) {
                 type="button"
                 variant="outline"
                 size="sm"
+                className={quietCta}
                 onClick={() => viewPhoto(viewing)}
               >
                 <ExternalLink />

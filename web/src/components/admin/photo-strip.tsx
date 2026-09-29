@@ -171,26 +171,25 @@ export function PhotoStrip({
                   selectMode ? toggle(photo.id) : setViewingIndex(index)
                 }
                 className={cn(
-                  "bg-ink/5 relative block size-20 overflow-hidden rounded-lg outline-none transition-[box-shadow,opacity] duration-200 focus-visible:ring-2 sm:size-24",
+                  "bg-ink/5 relative block size-20 overflow-hidden rounded-lg outline-none transition-[box-shadow,opacity] duration-150 focus-visible:ring-2 sm:size-24",
                   selectMode && isSelected
                     ? "ring-canvas ring-2"
-                    : "ring-ink/5 focus-visible:ring-canvas/50 ring-1",
+                    : "ring-ink/5 focus-visible:ring-primary/55 ring-1",
+                  !selectMode && "hover:ring-primary/60 active:opacity-85",
                   selectMode && !isSelected && "opacity-70 hover:opacity-100",
                 )}
               >
                 <img
-                  src={photo.url}
+                  src={photo.thumbUrl || photo.url}
                   alt=""
                   loading="lazy"
-                  className={cn(
-                    "size-full object-cover transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                    !selectMode && "hover:scale-105",
-                  )}
+                  decoding="async"
+                  className="size-full object-cover"
                 />
                 {selectMode ? (
                   <span
                     className={cn(
-                      "absolute right-1.5 top-1.5 grid size-5 place-items-center rounded-full border transition-colors duration-150",
+                      "absolute right-1.5 top-1.5 z-10 grid size-5 place-items-center rounded-full border transition-colors duration-150",
                       isSelected
                         ? "bg-canvas border-canvas text-white"
                         : "bg-paper/85 border-ink/20 text-transparent",
@@ -227,8 +226,8 @@ export function PhotoStrip({
             </DialogTitle>
             <DialogDescription>
               {confirmCount === 1
-                ? "Cette photo sera supprimée définitivement. Le maître ne pourra plus la récupérer."
-                : "Ces photos seront supprimées définitivement. Le maître ne pourra plus les récupérer."}
+                ? "Cette photo sera supprimée définitivement. Le participant ne pourra plus la récupérer."
+                : "Ces photos seront supprimées définitivement. Le participant ne pourra plus les récupérer."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

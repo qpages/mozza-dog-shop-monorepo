@@ -10,7 +10,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test test/logger.test.ts",
+    "test": "node --import tsx --test test/*.test.ts",
+    "photos:thumbs": "node --env-file=.env --import tsx src/shooting/backfill-thumbnails.ts",
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file=.env --import tsx src/migrate.ts",
@@ -30,7 +31,8 @@
     "drizzle-orm": "^0.45.3",
     "fastify": "^5.12.5",
     "fastify-plugin": "^6.0.0",
-    "postgres": "^3.4.9"
+    "postgres": "^3.4.9",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@types/archiver": "^8.0.0",

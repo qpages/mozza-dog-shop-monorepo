@@ -29,6 +29,7 @@ export type ObjectStorage = {
     key: string,
   ) => Promise<{ byteSize: number; contentType: string | undefined } | null>;
   getStream: (key: string) => Promise<Readable>;
+  put: (key: string, body: Buffer, contentType: string) => Promise<void>;
   removeMany: (keys: string[]) => Promise<void>;
 };
 
@@ -94,7 +95,10 @@ export default fp(
                 {
                   AllowedOrigins: parseWebOrigins(app.config.WEB_ORIGIN),
                   AllowedMethods: ["GET", "PUT", "HEAD"],
-                  AllowedHeaders: ["Content-Type"],
+                  // Garage matches Access-Control-Request-Headers byte-for-byte.
+                  // Browsers send "content-type" in lowercase, so "Content-Type"
+                  // alone rejects every preflight.
+                  AllowedHeaders: ["*"],
                   MaxAgeSeconds: 3600,
                 },
               ],
@@ -157,6 +161,17 @@ export default fp(
           throw new Error(`empty object body: ${key}`);
         }
         return result.Body as Readable;
+      },
+      put: async (key, body, contentType) => {
+        await client.send(
+          new PutObjectCommand({
+            Bucket: R2_BUCKET,
+            Key: key,
+            Body: body,
+            ContentType: contentType,
+            ContentLength: body.length,
+          }),
+        );
       },
       removeMany: async (keys) => {
         for (let i = 0; i < keys.length; i += DELETE_BATCH_SIZE) {

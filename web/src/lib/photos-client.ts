@@ -3,6 +3,7 @@ import { resolveApiUrl } from "@/lib/api";
 export type OwnerPhoto = {
   id: string;
   url: string;
+  thumbUrl: string;
   downloadUrl: string;
   title: string;
   byteSize: number;

@@ -5,6 +5,7 @@ import {
   ChevronRight,
   FileType,
   Weight,
+  XIcon,
 } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import {
@@ -16,6 +17,7 @@ import { subtleText } from "@/components/admin/styles";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -48,7 +50,9 @@ export function PhotoLightbox({
   showUploadedAt = true,
 }: Props) {
   const viewing = index !== null ? (photos[index] ?? null) : null;
-  const canNavigate = photos.length > 1;
+  const showNav = photos.length > 1;
+  const canPrev = index !== null && index > 0;
+  const canNext = index !== null && index < photos.length - 1;
   const indexRef = useRef(index);
   indexRef.current = index;
 
@@ -68,11 +72,13 @@ export function PhotoLightbox({
       const current = indexRef.current;
       if (current === null) return;
       if (event.key === "ArrowLeft") {
+        if (current <= 0) return;
         event.preventDefault();
-        onIndexChange((current - 1 + photos.length) % photos.length);
+        onIndexChange(current - 1);
       } else if (event.key === "ArrowRight") {
+        if (current >= photos.length - 1) return;
         event.preventDefault();
-        onIndexChange((current + 1) % photos.length);
+        onIndexChange(current + 1);
       }
     }
 
@@ -81,8 +87,10 @@ export function PhotoLightbox({
   }, [index, onIndexChange, photos.length]);
 
   function step(delta: number) {
-    if (index === null || !canNavigate) return;
-    onIndexChange((index + delta + photos.length) % photos.length);
+    if (index === null || !showNav) return;
+    const next = index + delta;
+    if (next < 0 || next >= photos.length) return;
+    onIndexChange(next);
   }
 
   return (
@@ -92,28 +100,59 @@ export function PhotoLightbox({
         if (!open) onIndexChange(null);
       }}
     >
-      <DialogContent showCloseButton className="gap-3 p-3 sm:max-w-2xl">
+      <DialogContent
+        showCloseButton={false}
+        className={cn(
+          // Fixed viewport frame — size never follows the image.
+          // Override DialogContent defaults (w-full / sm:max-w-sm) at every breakpoint.
+          "bg-paper text-ink ring-ink/10 shadow-paper flex max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none",
+          // Mobile: nearly full screen (small inset only).
+          "h-[calc(100dvh-0.75rem)] w-[calc(100vw-0.75rem)] rounded-xl",
+          // Desktop: large stable frame with a calm margin.
+          "sm:h-[min(100dvh-2rem,52rem)] sm:w-[min(100vw-2rem,56rem)] sm:rounded-2xl",
+        )}
+        // Pointer dismiss restores focus with :focus-visible on the thumb —
+        // skip that restore so no ring sits on the closed grid. Keyboard
+        // (Escape) keeps default restore for continued tabbing.
+        finalFocus={(closeType) => (closeType === "keyboard" ? true : false)}
+      >
         <DialogHeader className="sr-only">
           <DialogTitle>Photo</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         {viewing && index !== null ? (
           <>
-            <div className="relative">
+            <div className="bg-ink/5 relative isolate min-h-0 flex-1">
               <img
                 src={viewing.url}
                 alt=""
-                className="bg-muted max-h-[70vh] w-full rounded-lg object-contain"
+                className="absolute inset-0 size-full object-contain"
               />
-              {canNavigate ? (
+
+              <DialogClose
+                render={
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="bg-paper/95 text-ink ring-ink/10 hover:bg-paper absolute right-2.5 top-2.5 z-10 size-11 shadow-sm ring-1 transition-colors duration-150 active:translate-y-0 sm:size-9"
+                  />
+                }
+              >
+                <XIcon />
+                <span className="sr-only">Fermer</span>
+              </DialogClose>
+
+              {showNav ? (
                 <>
                   <Button
                     type="button"
                     variant="secondary"
                     size="icon"
                     aria-label="Photo précédente"
+                    disabled={!canPrev}
                     onClick={() => step(-1)}
-                    className="bg-paper/90 hover:bg-paper absolute left-2 top-1/2 -translate-y-1/2 shadow-sm"
+                    className="bg-paper/95 text-ink ring-ink/10 hover:bg-paper active:not-aria-[haspopup]:translate-y-0 absolute inset-y-0 left-2.5 z-10 my-auto size-11 shadow-sm ring-1 transition-colors duration-150 disabled:opacity-35 sm:left-3 sm:size-10"
                   >
                     <ChevronLeft className="size-5" />
                   </Button>
@@ -122,54 +161,82 @@ export function PhotoLightbox({
                     variant="secondary"
                     size="icon"
                     aria-label="Photo suivante"
+                    disabled={!canNext}
                     onClick={() => step(1)}
-                    className="bg-paper/90 hover:bg-paper absolute right-2 top-1/2 -translate-y-1/2 shadow-sm"
+                    className="bg-paper/95 text-ink ring-ink/10 hover:bg-paper active:not-aria-[haspopup]:translate-y-0 absolute inset-y-0 right-2.5 z-10 my-auto size-11 shadow-sm ring-1 transition-colors duration-150 disabled:opacity-35 sm:right-3 sm:size-10"
                   >
                     <ChevronRight className="size-5" />
                   </Button>
                 </>
               ) : null}
             </div>
-            <div className="flex flex-col gap-1.5 px-0.5">
-              {viewing.title ? (
-                <p
-                  className="text-foreground truncate text-sm font-medium leading-snug"
-                  title={viewing.title}
-                >
-                  {viewing.title}
-                </p>
-              ) : null}
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
-                <dl className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
-                  <div className="inline-flex items-center gap-1.5">
-                    <Weight className="size-3.5 shrink-0" aria-hidden />
-                    <dt className="sr-only">Taille</dt>
-                    <dd>{formatBytes(viewing.byteSize)}</dd>
-                  </div>
-                  <div className="inline-flex items-center gap-1.5">
-                    <FileType className="size-3.5 shrink-0" aria-hidden />
-                    <dt className="sr-only">Format</dt>
-                    <dd>{formatMime(viewing.contentType)}</dd>
-                  </div>
-                  {showUploadedAt ? (
+
+            <div className="border-ink/10 flex shrink-0 flex-col gap-2.5 border-t px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-4">
+              <div className="min-w-0 flex-1 space-y-1">
+                {viewing.title ? (
+                  <p
+                    className="text-ink truncate text-sm font-medium leading-snug"
+                    title={viewing.title}
+                  >
+                    {viewing.title}
+                  </p>
+                ) : null}
+                <div className="flex items-center justify-between gap-3">
+                  <dl
+                    className={cn(
+                      "type-caption flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1",
+                      subtleText,
+                    )}
+                  >
                     <div className="inline-flex items-center gap-1.5">
-                      <Calendar className="size-3.5 shrink-0" aria-hidden />
-                      <dt className="sr-only">Uploadé le</dt>
-                      <dd>{formatDateTime(viewing.uploadedAt)}</dd>
+                      <Weight className="size-3.5 shrink-0" aria-hidden />
+                      <dt className="sr-only">Taille</dt>
+                      <dd>{formatBytes(viewing.byteSize)}</dd>
                     </div>
-                  ) : null}
-                </dl>
-                <div className="flex items-center gap-3">
-                  {canNavigate ? (
+                    <div className="inline-flex items-center gap-1.5">
+                      <FileType className="size-3.5 shrink-0" aria-hidden />
+                      <dt className="sr-only">Format</dt>
+                      <dd>{formatMime(viewing.contentType)}</dd>
+                    </div>
+                    {showUploadedAt ? (
+                      <div className="inline-flex items-center gap-1.5">
+                        <Calendar className="size-3.5 shrink-0" aria-hidden />
+                        <dt className="sr-only">Uploadé le</dt>
+                        <dd>{formatDateTime(viewing.uploadedAt)}</dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                  {showNav ? (
                     <p
-                      className={cn("text-sm tabular-nums", subtleText)}
+                      className={cn(
+                        "type-caption shrink-0 tabular-nums sm:hidden",
+                        subtleText,
+                      )}
                       aria-live="polite"
                     >
                       {index + 1} / {photos.length}
                     </p>
                   ) : null}
-                  {actions}
                 </div>
+              </div>
+
+              <div className="flex w-full flex-col gap-2.5 sm:w-auto sm:shrink-0 sm:flex-row sm:items-center sm:justify-end">
+                {showNav ? (
+                  <p
+                    className={cn(
+                      "type-caption hidden tabular-nums sm:block",
+                      subtleText,
+                    )}
+                    aria-live="polite"
+                  >
+                    {index + 1} / {photos.length}
+                  </p>
+                ) : null}
+                {actions ? (
+                  <div className="**:data-[slot=button]:min-h-11 **:data-[slot=button]:w-full sm:**:data-[slot=button]:min-h-8 sm:**:data-[slot=button]:w-auto grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
+                    {actions}
+                  </div>
+                ) : null}
               </div>
             </div>
           </>

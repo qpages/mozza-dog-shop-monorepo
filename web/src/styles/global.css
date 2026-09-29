@@ -211,3 +211,65 @@ html.has-mozza-cursor button,
 html.has-mozza-cursor [role="button"] {
   cursor: none;
 }
+
+.photo-tiles > li {
+  position: relative;
+}
+
+.photo-tiles > li:nth-child(5n + 1) .photo-tile {
+  --r: -3deg;
+  --y: -3px;
+}
+
+.photo-tiles > li:nth-child(5n + 2) .photo-tile {
+  --r: -1.5deg;
+  --y: -2px;
+}
+
+.photo-tiles > li:nth-child(5n + 3) .photo-tile {
+  --r: 0.5deg;
+  --y: -4px;
+}
+
+.photo-tiles > li:nth-child(5n + 4) .photo-tile {
+  --r: 2.5deg;
+  --y: -2px;
+}
+
+.photo-tiles > li:nth-child(5n) .photo-tile {
+  --r: -2deg;
+  --y: -3px;
+}
+
+.photo-tile {
+  --r: -2deg;
+  --y: -3px;
+  transform: none;
+  transition: transform 350ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.photo-tiles > li:has(.photo-tile:hover),
+.photo-tiles > li:has(.photo-tile:focus-visible) {
+  z-index: 2;
+}
+
+@media (hover: hover) {
+  .photo-tile:hover {
+    transform: rotate(var(--r)) translateY(var(--y));
+  }
+}
+
+.photo-tile:focus-visible {
+  transform: rotate(var(--r)) translateY(var(--y));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo-tile {
+    transition: none;
+  }
+
+  .photo-tile:hover,
+  .photo-tile:focus-visible {
+    transform: none;
+  }
+}
