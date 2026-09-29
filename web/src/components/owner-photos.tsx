@@ -323,7 +323,7 @@ function GalleryScreen({
                 >
                   {opened.name}
                 </h1>
-                <ShootingFacts shooting={opened} className="text-paper/80" />
+                <ShootingFacts shooting={opened} className="text-paper/85" />
               </div>
               {opened.photos.length === 0 ? null : (
                 <div className="flex shrink-0 items-center gap-2">

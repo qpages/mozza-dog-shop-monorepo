@@ -1,13 +1,6 @@
 import { cn } from "cn";
 import { Check } from "lucide-react";
-import {
-  useEffect,
-  useImperativeHandle,
-  useRef,
-  useState,
-  type Ref,
-  type RefObject,
-} from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { PhotoLightbox } from "@/components/photo-lightbox";
 import { quietCta, subtleText } from "@/components/admin/styles";
 import { Button } from "@/components/ui/button";
@@ -21,10 +14,6 @@ import {
 } from "@/components/ui/dialog";
 import type { Photo } from "@/lib/admin-client";
 
-export type PhotoStripHandle = {
-  confirmSelected: () => void;
-};
-
 type Props = {
   photos: Photo[];
   archived: boolean;
@@ -32,9 +21,7 @@ type Props = {
   selectMode: boolean;
   idleFocusRef: RefObject<HTMLButtonElement | null>;
   onSelectModeChange: (value: boolean) => void;
-  onSelectedCountChange: (count: number) => void;
   onDelete: (photoIds: string[]) => void;
-  ref?: Ref<PhotoStripHandle>;
 };
 
 export function PhotoStrip({
@@ -44,9 +31,7 @@ export function PhotoStrip({
   selectMode,
   idleFocusRef,
   onSelectModeChange,
-  onSelectedCountChange,
   onDelete,
-  ref,
 }: Props) {
   const [viewingIndex, setViewingIndex] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -62,7 +47,7 @@ export function PhotoStrip({
   const count = selected.size;
   const allSelected = count > 0 && count === photos.length;
 
-  // Leaving selection via Annuler should return to the header delete control.
+  // Leaving selection via Annuler should return to the overflow menu.
   // Confirming a deletion is skipped: the dialog restores focus on its own.
   useEffect(() => {
     if (!skipFocus.current && !selectMode && wasSelecting.current) {
@@ -76,20 +61,11 @@ export function PhotoStrip({
     if (!selectMode) setSelected(new Set());
   }, [selectMode]);
 
-  useEffect(() => {
-    onSelectedCountChange(count);
-  }, [count, onSelectedCountChange]);
-
   function openConfirm() {
     if (count === 0 || deleting) return;
     setConfirmCount(count);
     setConfirmOpen(true);
   }
-
-  useImperativeHandle(ref, () => ({ confirmSelected: openConfirm }), [
-    count,
-    deleting,
-  ]);
 
   function toggle(id: string) {
     setSelected((current) => {
@@ -115,17 +91,22 @@ export function PhotoStrip({
   return (
     <div ref={rootRef} className="flex flex-col gap-3">
       {archived || !selectMode ? null : (
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-nowrap sm:items-center sm:justify-between">
           <span
             role="status"
             aria-live="polite"
-            className={cn("text-sm tabular-nums", subtleText)}
+            className={cn("grid text-sm tabular-nums", subtleText)}
           >
-            {count === 0
-              ? "Sélectionnez des photos"
-              : `${count} sélectionnée${count > 1 ? "s" : ""}`}
+            <span className="invisible col-start-1 row-start-1" aria-hidden>
+              Sélectionnez des photos
+            </span>
+            <span className="col-start-1 row-start-1">
+              {count === 0
+                ? "Sélectionnez des photos"
+                : `${count} sélectionnée${count > 1 ? "s" : ""}`}
+            </span>
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             <Button
               type="button"
               variant="ghost"
@@ -139,7 +120,14 @@ export function PhotoStrip({
                 )
               }
             >
-              {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
+              <span className="inline-grid">
+                <span className="invisible col-start-1 row-start-1" aria-hidden>
+                  Tout désélectionner
+                </span>
+                <span className="col-start-1 row-start-1">
+                  {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
+                </span>
+              </span>
             </Button>
             <Button
               type="button"
@@ -150,6 +138,15 @@ export function PhotoStrip({
               onClick={exitSelect}
             >
               Annuler
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={count === 0 || deleting}
+              onClick={openConfirm}
+            >
+              {deleting ? "Suppression…" : "Supprimer"}
             </Button>
           </div>
         </div>

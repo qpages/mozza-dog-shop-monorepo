@@ -60,100 +60,98 @@ export function ShootingList({
         )}
       </div>
 
-      <section className={panelClass} aria-label="Shootings en cours">
+      <section className="flex flex-col gap-4" aria-label="Shootings en cours">
         {loading ? <ListSkeleton /> : null}
 
-        {empty ? (
-          <div className="px-5 pt-5">
-            <p className="font-medium">
-              {archived.length === 0
-                ? "Aucun shooting pour l'instant"
-                : "Aucun shooting en cours"}
-            </p>
-            <p className={cn("mt-1 text-sm", subtleText)}>
-              Crée un shooting, puis ajoute les chiens et leurs photos.
-            </p>
+        {showForm ? (
+          <div className={panelClass}>
+            {empty ? (
+              <div className="px-5 pt-5">
+                <p className="font-medium">
+                  {archived.length === 0
+                    ? "Aucun shooting pour l'instant"
+                    : "Aucun shooting en cours"}
+                </p>
+                <p className={cn("mt-1 text-sm", subtleText)}>
+                  Crée un shooting, puis ajoute les chiens et leurs photos.
+                </p>
+              </div>
+            ) : null}
+            <form
+              className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-end"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                if (creating) return;
+                const data = new FormData(event.currentTarget);
+                setCreating(true);
+                try {
+                  const id = await createShooting({
+                    shotOn: String(data.get("shotOn") ?? ""),
+                    name: String(data.get("name") ?? ""),
+                  });
+                  if (!id) {
+                    toast.error("Impossible de créer le shooting.");
+                    return;
+                  }
+                  toast.success("Shooting créé.");
+                  setFormOpen(false);
+                  onCreated(id);
+                } catch {
+                  toast.error("Impossible de créer le shooting.");
+                } finally {
+                  setCreating(false);
+                }
+              }}
+            >
+              <div className="flex flex-[1.4] flex-col gap-1.5">
+                <label htmlFor="shooting-name" className="text-sm font-medium">
+                  Nom
+                </label>
+                <input
+                  id="shooting-name"
+                  name="name"
+                  type="text"
+                  required
+                  maxLength={80}
+                  autoFocus={!empty}
+                  placeholder="Séance du dimanche"
+                  className={fieldClass}
+                />
+              </div>
+              <div className="flex flex-1 flex-col gap-1.5">
+                <label htmlFor="shot-on" className="text-sm font-medium">
+                  Date
+                </label>
+                <input
+                  id="shot-on"
+                  name="shotOn"
+                  type="date"
+                  required
+                  defaultValue={today()}
+                  className={fieldClass}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" size="lg" disabled={creating}>
+                  {creating ? "Création…" : "Créer"}
+                </Button>
+                {empty ? null : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="lg"
+                    onClick={() => setFormOpen(false)}
+                  >
+                    Annuler
+                  </Button>
+                )}
+              </div>
+            </form>
           </div>
         ) : null}
 
-        {showForm ? (
-          <form
-            className={cn(
-              "flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-end",
-              !empty && "border-ink/10 bg-canvas/5 border-b",
-            )}
-            onSubmit={async (event) => {
-              event.preventDefault();
-              if (creating) return;
-              const data = new FormData(event.currentTarget);
-              setCreating(true);
-              try {
-                const id = await createShooting({
-                  shotOn: String(data.get("shotOn") ?? ""),
-                  name: String(data.get("name") ?? ""),
-                });
-                if (!id) {
-                  toast.error("Impossible de créer le shooting.");
-                  return;
-                }
-                toast.success("Shooting créé.");
-                setFormOpen(false);
-                onCreated(id);
-              } catch {
-                toast.error("Impossible de créer le shooting.");
-              } finally {
-                setCreating(false);
-              }
-            }}
-          >
-            <div className="flex flex-[1.4] flex-col gap-1.5">
-              <label htmlFor="shooting-name" className="text-sm font-medium">
-                Nom
-              </label>
-              <input
-                id="shooting-name"
-                name="name"
-                type="text"
-                required
-                maxLength={80}
-                autoFocus={!empty}
-                placeholder="Séance du dimanche"
-                className={fieldClass}
-              />
-            </div>
-            <div className="flex flex-1 flex-col gap-1.5">
-              <label htmlFor="shot-on" className="text-sm font-medium">
-                Date
-              </label>
-              <input
-                id="shot-on"
-                name="shotOn"
-                type="date"
-                required
-                defaultValue={today()}
-                className={fieldClass}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button type="submit" size="lg" disabled={creating}>
-                {creating ? "Création…" : "Créer"}
-              </Button>
-              {empty ? null : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="lg"
-                  onClick={() => setFormOpen(false)}
-                >
-                  Annuler
-                </Button>
-              )}
-            </div>
-          </form>
-        ) : null}
-
         {active.length > 0 ? (
-          <ul className="divide-ink/10 divide-y">
+          <ul className="flex flex-col gap-4">
             {active.map((shooting) => (
               <ShootingLink
                 key={shooting.id}
@@ -184,18 +182,13 @@ export function ShootingList({
               : `${archived.length} shootings archivés`}
           </button>
           {showArchived ? (
-            <ul
-              className={cn(
-                panelClass,
-                "divide-ink/10 bg-paper/85 divide-y shadow-none",
-              )}
-              aria-label="Shootings archivés"
-            >
+            <ul className="flex flex-col gap-4" aria-label="Shootings archivés">
               {archived.map((shooting) => (
                 <ShootingLink
                   key={shooting.id}
                   shooting={shooting}
                   onOpen={onOpen}
+                  muted
                 />
               ))}
             </ul>
@@ -209,9 +202,11 @@ export function ShootingList({
 function ShootingLink({
   shooting,
   onOpen,
+  muted = false,
 }: {
   shooting: Shooting;
   onOpen: (id: string) => void;
+  muted?: boolean;
 }) {
   function onClick(event: MouseEvent<HTMLAnchorElement>) {
     if (event.metaKey || event.ctrlKey || event.shiftKey) return;
@@ -220,7 +215,7 @@ function ShootingLink({
   }
 
   return (
-    <li>
+    <li className={cn(panelClass, muted && "bg-paper/85 shadow-none")}>
       <a
         href={`?shooting=${shooting.id}`}
         onClick={onClick}
@@ -247,9 +242,9 @@ export function ListSkeleton() {
       <p className="sr-only" role="status">
         Chargement…
       </p>
-      <ul aria-hidden="true" className="divide-ink/10 divide-y">
+      <ul aria-hidden="true" className="flex flex-col gap-4">
         {[0, 1, 2].map((row) => (
-          <li key={row} className="px-5 py-4">
+          <li key={row} className={cn(panelClass, "px-5 py-4")}>
             <div className="bg-ink/10 h-4 w-40 animate-pulse rounded motion-reduce:animate-none" />
             <div className="mt-2 flex gap-3">
               <div className="bg-ink/7 h-3.5 w-28 animate-pulse rounded motion-reduce:animate-none" />
