@@ -52,7 +52,7 @@ Variables API validées au démarrage dans `api/src/app.ts` :
 
 - **`JWT_SECRET`** (obligatoire, ≥ 16 caractères) : secret de signature des cookies admin. En prod, utiliser une valeur longue et aléatoire (générateur de mots de passe ou `openssl rand -base64 32`), jamais la valeur d'exemple de `api/.env.example`.
 - **`WEB_ORIGIN`** (défaut dev : `http://localhost:4321`) : origine(s) CORS autorisée(s) pour le front, séparées par des virgules. En prod, une URL exacte (ex. `https://photos.mozzadogshop.com`), sans wildcard. En dev (`NODE_ENV` ≠ `production`), les origines LAN / Docker (`192.168.x`, `10.x`, `127.x`, `172.16–31.x`) sont aussi acceptées.
-- **`DATABASE_URL`** : Postgres managé côté hébergeur (Coolify, etc.), pas le conteneur du `docker-compose.yml`.
+- **`DATABASE_URL`** : Postgres managé côté hébergeur (Coolify, etc.), pas le conteneur du `docker-compose.yml`. Le boot API et `pnpm db:migrate` passent par le même runner (`api/src/migrate.ts`) sur `api/drizzle/`. Échec migrate → exit non-zéro. Seed admin manuel (`node dist/admin/seed.js`).
 - **Stockage objet** : Cloudflare R2 (`R2_ACCOUNT_ID`, clés, bucket). Laisser `R2_ENDPOINT` vide en prod ; Garage n'est que pour le dev local.
 
 ### Docker Compose

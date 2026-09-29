@@ -2,6 +2,9 @@
 #   docker build -f api/Dockerfile -t mozza-api .
 #
 # Coolify: Base Directory = / (repo root), Dockerfile = api/Dockerfile
+# Runtime: DATABASE_URL is injected by Coolify. Entry point applies pending
+# Drizzle SQL migrations then execs the API. Seed stays manual
+# (node dist/admin/seed.js).
 
 FROM node:22-alpine AS base
 RUN corepack enable && corepack prepare pnpm@10.15.1 --activate
@@ -27,10 +30,13 @@ ENV PORT=8787
 
 RUN addgroup -S mozza && adduser -S mozza -G mozza
 COPY --from=build --chown=mozza:mozza /out ./
+COPY --from=build --chown=mozza:mozza /app/api/drizzle ./drizzle
+COPY --from=build --chmod=755 --chown=mozza:mozza /app/api/docker-entrypoint.sh ./docker-entrypoint.sh
 
 USER mozza
 EXPOSE 8787
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:8787/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "dist/index.js"]
