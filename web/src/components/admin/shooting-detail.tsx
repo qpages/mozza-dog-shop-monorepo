@@ -39,6 +39,7 @@ import {
   addShootingOwner,
   deletePhotos,
   removeDog,
+  removeShootingOwner,
   updateShooting,
   PHOTO_UPLOAD_REQUIRES_DOG_MESSAGE,
   uploadPhotos,
@@ -72,6 +73,10 @@ export function ShootingDetail({
   const [removingKey, setRemovingKey] = useState<string | null>(null);
   const [uploadingOwnerId, setUploadingOwnerId] = useState<string | null>(null);
   const [deletingOwnerId, setDeletingOwnerId] = useState<string | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<
+    Shooting["owners"][number] | null
+  >(null);
+  const [removingOwnerId, setRemovingOwnerId] = useState<string | null>(null);
   const empty = shooting.owners.length === 0;
   const showForm = !shooting.archived && (formOpen || empty);
 
@@ -203,6 +208,25 @@ export function ShootingDetail({
     }
   }
 
+  async function onRemoveOwner() {
+    if (!pendingRemove || removingOwnerId) return;
+    setRemovingOwnerId(pendingRemove.id);
+    try {
+      const result = await removeShootingOwner(shooting.id, pendingRemove.id);
+      if (result === "error") {
+        toast.error("Impossible de retirer le maître.");
+        return;
+      }
+      toast.success("Maître retiré.");
+      setPendingRemove(null);
+      onChanged();
+    } catch {
+      toast.error("Impossible de retirer le maître.");
+    } finally {
+      setRemovingOwnerId(null);
+    }
+  }
+
   async function onSaveEdit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving) return;
@@ -245,7 +269,7 @@ export function ShootingDetail({
           <ChevronLeft className="size-4" />
           Shootings
         </a>
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div className="flex min-w-0 flex-col gap-1">
             <h1
               ref={heading}
@@ -256,16 +280,16 @@ export function ShootingDetail({
             </h1>
             <ShootingMeta shooting={shooting} />
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
             {showForm || shooting.archived ? null : (
               <Button
                 type="button"
                 size="lg"
-                className="bg-paper text-canvas px-3 hover:bg-white"
+                className="bg-paper text-canvas flex-1 px-3 hover:bg-white sm:flex-none"
                 onClick={() => setFormOpen(true)}
               >
                 <Plus />
-                Ajouter un maître
+                Ajouter un participant
               </Button>
             )}
             <DropdownMenu>
@@ -276,7 +300,7 @@ export function ShootingDetail({
                     variant="ghost"
                     size="icon-lg"
                     aria-label="Actions du shooting"
-                    className="text-paper hover:bg-paper/10 hover:text-paper aria-expanded:bg-paper/10 aria-expanded:text-paper"
+                    className="text-paper hover:bg-paper/10 hover:text-paper aria-expanded:bg-paper/10 aria-expanded:text-paper ml-auto"
                   />
                 }
               >
@@ -306,9 +330,14 @@ export function ShootingDetail({
         </div>
       </div>
 
-      <section className={panelClass} aria-label="Chiens du shooting">
+      <section className="flex flex-col gap-4" aria-label="Chiens du shooting">
         {shooting.archived ? (
-          <div className="border-ink/10 bg-ink/3 flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div
+            className={cn(
+              panelClass,
+              "flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between",
+            )}
+          >
             <p className="text-sm">
               <span className="font-medium">Shooting archivé.</span>{" "}
               <span className={subtleText}>
@@ -328,24 +357,86 @@ export function ShootingDetail({
           </div>
         ) : null}
 
-        {empty && !shooting.archived ? (
-          <div className="px-5 pt-5">
-            <p className="font-medium">Aucun maître pour l'instant</p>
-            <p className={cn("mt-1 max-w-prose text-sm", subtleText)}>
-              Ajoute un maître par e-mail, puis ses chiens depuis sa ligne. Il
-              retrouvera ses photos avec cet e-mail.
-            </p>
+        {showForm ? (
+          <div className={panelClass}>
+            {empty ? (
+              <div className="px-5 pt-5">
+                <p className="font-medium">Aucun maître pour l'instant</p>
+                <p className={cn("mt-1 max-w-prose text-sm", subtleText)}>
+                  Ajoute un maître par e-mail, puis ses chiens depuis sa ligne.
+                  Il retrouvera ses photos avec cet e-mail.
+                </p>
+              </div>
+            ) : null}
+            <form
+              className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-end"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                if (addingNew) return;
+                const email = ownerEmail.trim();
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                  toast.error("Choisis un maître ou saisis son e-mail.");
+                  return;
+                }
+                setAddingNew(true);
+                try {
+                  const ok = await addOwner(email);
+                  if (!ok) return;
+                  setFormOpen(true);
+                  setOwnerEmail("");
+                  emailRef.current?.focus();
+                } finally {
+                  setAddingNew(false);
+                }
+              }}
+            >
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <label
+                  htmlFor={`new-email-${shooting.id}`}
+                  className="text-sm font-medium"
+                >
+                  E-mail du maître
+                </label>
+                <OwnerEmailField
+                  id={`new-email-${shooting.id}`}
+                  value={ownerEmail}
+                  onValueChange={setOwnerEmail}
+                  excludeEmails={shooting.owners.map((owner) => owner.email)}
+                  disabled={addingNew}
+                  autoFocus={!empty}
+                  inputRef={emailRef}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" size="lg" disabled={addingNew}>
+                  {addingNew ? "Ajout…" : "Ajouter"}
+                </Button>
+                {empty ? null : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="lg"
+                    onClick={() => {
+                      setOwnerEmail("");
+                      setFormOpen(false);
+                    }}
+                  >
+                    Fermer
+                  </Button>
+                )}
+              </div>
+            </form>
           </div>
         ) : null}
 
         {empty ? null : (
-          <ul className="divide-ink/10 divide-y">
+          <ul className="flex flex-col gap-4">
             {shooting.owners.map((owner) => (
               <OwnerRow
                 key={owner.id}
                 owner={owner}
                 archived={shooting.archived}
-                locked={removingKey !== null}
+                locked={removingKey !== null || removingOwnerId !== null}
                 removingDog={
                   removingKey?.startsWith(`${owner.id}:`)
                     ? removingKey.slice(owner.id.length + 1)
@@ -354,83 +445,21 @@ export function ShootingDetail({
                 uploading={uploadingOwnerId === owner.id}
                 uploadLocked={uploadingOwnerId !== null}
                 deletingPhotos={deletingOwnerId === owner.id}
+                removing={removingOwnerId === owner.id}
                 onAddDog={(name) => addDog(owner.id, name)}
                 onRemoveDog={(name) => void onRemoveDog(owner.id, name)}
                 onUpload={(files) => void onUpload(owner.id, files)}
                 onDeletePhotos={(photoIds) =>
                   void onDeletePhotos(owner.id, photoIds)
                 }
+                onRemove={() => setPendingRemove(owner)}
               />
             ))}
           </ul>
         )}
 
-        {showForm ? (
-          <form
-            className={cn(
-              "flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-end",
-              !empty && "border-ink/10 bg-canvas/5 border-t",
-            )}
-            onSubmit={async (event) => {
-              event.preventDefault();
-              if (addingNew) return;
-              const email = ownerEmail.trim();
-              if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                toast.error("Choisis un maître ou saisis son e-mail.");
-                return;
-              }
-              setAddingNew(true);
-              try {
-                const ok = await addOwner(email);
-                if (!ok) return;
-                setFormOpen(true);
-                setOwnerEmail("");
-                emailRef.current?.focus();
-              } finally {
-                setAddingNew(false);
-              }
-            }}
-          >
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <label
-                htmlFor={`new-email-${shooting.id}`}
-                className="text-sm font-medium"
-              >
-                E-mail du maître
-              </label>
-              <OwnerEmailField
-                id={`new-email-${shooting.id}`}
-                value={ownerEmail}
-                onValueChange={setOwnerEmail}
-                excludeEmails={shooting.owners.map((owner) => owner.email)}
-                disabled={addingNew}
-                autoFocus={!empty}
-                inputRef={emailRef}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button type="submit" size="lg" disabled={addingNew}>
-                {addingNew ? "Ajout…" : "Ajouter"}
-              </Button>
-              {empty ? null : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="lg"
-                  onClick={() => {
-                    setOwnerEmail("");
-                    setFormOpen(false);
-                  }}
-                >
-                  Fermer
-                </Button>
-              )}
-            </div>
-          </form>
-        ) : null}
-
         {empty && shooting.archived ? (
-          <p className={cn("px-5 py-4 text-sm", subtleText)}>
+          <p className={cn(panelClass, "px-5 py-4 text-sm", subtleText)}>
             Aucun chien sur ce shooting.
           </p>
         ) : null}
@@ -511,6 +540,51 @@ export function ShootingDetail({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={pendingRemove !== null}
+        onOpenChange={(open) => {
+          if (!open && !removingOwnerId) setPendingRemove(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Retirer ce maître ?</DialogTitle>
+            <DialogDescription>
+              {pendingRemove ? removeOwnerMessage(pendingRemove) : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className={quietCta}
+              disabled={removingOwnerId !== null}
+              onClick={() => setPendingRemove(null)}
+            >
+              Annuler
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={removingOwnerId !== null}
+              onClick={() => void onRemoveOwner()}
+            >
+              {removingOwnerId ? "Retrait…" : "Retirer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
+}
+
+function removeOwnerMessage(owner: Shooting["owners"][number]) {
+  if (owner.photoCount === 0) {
+    return `${owner.email} sera retiré de ce shooting. Tu pourras le rajouter plus tard.`;
+  }
+  if (owner.photoCount === 1) {
+    return `${owner.email} et sa photo seront retirés de ce shooting. La photo sera supprimée définitivement.`;
+  }
+  return `${owner.email} et ses ${owner.photoCount} photos seront retirés de ce shooting. Les photos seront supprimées définitivement.`;
 }

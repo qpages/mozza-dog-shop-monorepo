@@ -481,6 +481,41 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
     },
   );
 
+  app.delete<{ Params: { shootingId: string; ownerId: string } }>(
+    "/shootings/:shootingId/owners/:ownerId",
+    { schema: { params: uuidParams("shootingId", "ownerId") } },
+    async (request, reply) => {
+      const shooting = await app.db.query.shootings.findFirst({
+        where: eq(shootings.id, request.params.shootingId),
+      });
+      if (!shooting) throw app.httpErrors.notFound("shooting not found");
+      if (shooting.archivedAt) {
+        throw app.httpErrors.conflict("shooting is archived");
+      }
+
+      const sheet = await app.db.query.shootingOwners.findFirst({
+        where: and(
+          eq(shootingOwners.shootingId, shooting.id),
+          eq(shootingOwners.ownerId, request.params.ownerId),
+        ),
+        with: { photos: true },
+      });
+      if (!sheet) throw app.httpErrors.notFound("owner not found");
+
+      const keys = sheet.photos.map((photo) => photo.objectKey);
+      // Remove from the object store first: if it fails we keep the database
+      // rows so the photos stay listed instead of pointing at missing objects.
+      if (keys.length > 0) {
+        await requireStorage(app).removeMany(keys);
+      }
+
+      await app.db
+        .delete(shootingOwners)
+        .where(eq(shootingOwners.id, sheet.id));
+      return reply.code(204).send();
+    },
+  );
+
   app.post<{ Params: { ownerId: string }; Body: { names: string[] } }>(
     "/owners/:ownerId/dogs",
     {
