@@ -17,6 +17,7 @@ export function LoginForm({
 }: Props) {
   const [visible, setVisible] = useState(false);
   const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
 
   return (
     <main className="admin-rise mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-5 px-6 pb-16">
@@ -30,16 +31,21 @@ export function LoginForm({
           onSubmit={async (event) => {
             event.preventDefault();
             setError("");
+            setPending(true);
             const data = new FormData(event.currentTarget);
-            const email = await login(
-              String(data.get("email") ?? ""),
-              String(data.get("password") ?? ""),
-            );
-            if (email === null) {
-              setError("E-mail ou mot de passe incorrect.");
-              return;
+            try {
+              const result = await login(
+                String(data.get("email") ?? ""),
+                String(data.get("password") ?? ""),
+              );
+              if (!result.ok) {
+                setError(result.message);
+                return;
+              }
+              onLoggedIn(result.email);
+            } finally {
+              setPending(false);
             }
-            onLoggedIn(email);
           }}
         >
           <label htmlFor="admin-email" className="text-sm font-medium">
@@ -82,9 +88,18 @@ export function LoginForm({
               {visible ? <EyeOff /> : <Eye />}
             </Button>
           </div>
-          {error ? <p className="text-destructive text-sm">{error}</p> : null}
-          <Button type="submit" size="lg" className="mt-2 w-full">
-            Entrer
+          {error ? (
+            <p role="alert" className="text-destructive text-sm">
+              {error}
+            </p>
+          ) : null}
+          <Button
+            type="submit"
+            size="lg"
+            className="mt-2 w-full"
+            disabled={pending}
+          >
+            {pending ? "Connexion…" : "Connexion"}
           </Button>
         </form>
       </div>

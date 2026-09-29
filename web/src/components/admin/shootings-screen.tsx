@@ -47,13 +47,14 @@ export function ShootingsScreen() {
     let cancelled = false;
 
     async function loadShootings() {
-      try {
-        const next = await listShootings();
-        if (next === null) return;
-        if (!cancelled) setShootings(next);
-      } catch {
-        if (!cancelled) setShootings([]);
+      const next = await listShootings();
+      if (cancelled) return;
+      if (next === null) {
+        setShootings([]);
+        toast.error("Impossible de charger les shootings.");
+        return;
       }
+      setShootings(next);
     }
 
     void loadShootings();
@@ -84,7 +85,10 @@ export function ShootingsScreen() {
 
   async function reloadShootings() {
     const next = await listShootings();
-    if (next === null) return;
+    if (next === null) {
+      toast.error("Impossible de recharger les shootings.");
+      return;
+    }
     setShootings(next);
   }
 

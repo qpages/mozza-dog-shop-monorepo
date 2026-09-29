@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { LoginForm } from "@/components/admin/login-form";
 import { ShootingsScreen } from "@/components/admin/shootings-screen";
+import { Button } from "@/components/ui/button";
+import { Toaster } from "@/components/ui/sonner";
 import { getSession, logout } from "@/lib/admin-client";
 
 type Props = {
@@ -29,7 +30,10 @@ export function AdminApp({ defaultEmail = "", defaultPassword = "" }: Props) {
 
   async function handleLogout() {
     const ok = await logout();
-    if (!ok) return;
+    if (!ok) {
+      toast.error("Déconnexion impossible. Réessaie dans un instant.");
+      return;
+    }
     setEmail(null);
   }
 

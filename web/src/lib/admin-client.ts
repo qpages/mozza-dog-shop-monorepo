@@ -29,6 +29,23 @@ const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 export const PHOTO_UPLOAD_REQUIRES_DOG_MESSAGE =
   "Ajoute au moins un chien à ce maître avant d'importer des photos.";
 
+export const API_UNREACHABLE_MESSAGE =
+  "Une erreur est survenue. Réessaie dans un instant.";
+
+async function request(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response | null> {
+  try {
+    return await fetch(`${resolveApiUrl()}${path}`, {
+      ...init,
+      credentials: init.credentials ?? "include",
+    });
+  } catch {
+    return null;
+  }
+}
+
 async function apiErrorMessage(response: Response): Promise<string | null> {
   try {
     const body = (await response.json()) as { message?: string };
@@ -42,46 +59,49 @@ async function apiErrorMessage(response: Response): Promise<string | null> {
 }
 
 export async function getSession(): Promise<string | null> {
-  try {
-    const response = await fetch(`${resolveApiUrl()}/admin/session`, {
-      credentials: "include",
-    });
-    if (!response.ok) return null;
-    const body = (await response.json()) as { email: string };
-    return body.email;
-  } catch {
-    return null;
-  }
-}
-
-export async function login(
-  email: string,
-  password: string,
-): Promise<string | null> {
-  const response = await fetch(`${resolveApiUrl()}/admin/session`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!response.ok) return null;
+  const response = await request("/admin/session");
+  if (!response?.ok) return null;
   const body = (await response.json()) as { email: string };
   return body.email;
 }
 
-export async function logout(): Promise<boolean> {
-  const response = await fetch(`${resolveApiUrl()}/admin/session`, {
-    method: "DELETE",
-    credentials: "include",
+export type LoginResult =
+  { ok: true; email: string } | { ok: false; message: string };
+
+export async function login(
+  email: string,
+  password: string,
+): Promise<LoginResult> {
+  const response = await request("/admin/session", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email, password }),
   });
-  return response.ok;
+  if (!response) {
+    return { ok: false, message: API_UNREACHABLE_MESSAGE };
+  }
+  if (response.ok) {
+    const body = (await response.json()) as { email: string };
+    return { ok: true, email: body.email };
+  }
+  if (response.status === 401 || response.status === 403) {
+    return { ok: false, message: "E-mail ou mot de passe incorrect." };
+  }
+  const fromApi = await apiErrorMessage(response);
+  return {
+    ok: false,
+    message: fromApi ?? "Connexion impossible. Réessaie dans un instant.",
+  };
+}
+
+export async function logout(): Promise<boolean> {
+  const response = await request("/admin/session", { method: "DELETE" });
+  return response?.ok === true;
 }
 
 export async function listShootings(): Promise<Shooting[] | null> {
-  const response = await fetch(`${resolveApiUrl()}/admin/shootings`, {
-    credentials: "include",
-  });
-  if (!response.ok) return null;
+  const response = await request("/admin/shootings");
+  if (!response?.ok) return null;
   const body = (await response.json()) as { shootings: Shooting[] };
   return body.shootings;
 }
@@ -90,13 +110,12 @@ export async function createShooting(input: {
   shotOn: string;
   name: string;
 }): Promise<string | null> {
-  const response = await fetch(`${resolveApiUrl()}/admin/shootings`, {
+  const response = await request("/admin/shootings", {
     method: "POST",
-    credentials: "include",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
   });
-  if (!response.ok) return null;
+  if (!response?.ok) return null;
   const body = (await response.json()) as { id: string };
   return body.id;
 }
@@ -105,32 +124,30 @@ export async function updateShooting(
   id: string,
   input: { shotOn: string; name: string },
 ): Promise<boolean> {
-  const response = await fetch(`${resolveApiUrl()}/admin/shootings/${id}`, {
+  const response = await request(`/admin/shootings/${id}`, {
     method: "PATCH",
-    credentials: "include",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
   });
-  return response.ok;
+  return response?.ok === true;
 }
 
 export async function setShootingArchived(
   id: string,
   archived: boolean,
 ): Promise<boolean> {
-  const response = await fetch(
-    `${resolveApiUrl()}/admin/shootings/${id}/${archived ? "archive" : "restore"}`,
-    { method: "POST", credentials: "include" },
+  const response = await request(
+    `/admin/shootings/${id}/${archived ? "archive" : "restore"}`,
+    { method: "POST" },
   );
-  return response.ok;
+  return response?.ok === true;
 }
 
 export async function deleteShooting(id: string): Promise<boolean> {
-  const response = await fetch(`${resolveApiUrl()}/admin/shootings/${id}`, {
+  const response = await request(`/admin/shootings/${id}`, {
     method: "DELETE",
-    credentials: "include",
   });
-  return response.ok;
+  return response?.ok === true;
 }
 
 export type OwnerSuggestion = {
@@ -145,31 +162,21 @@ export async function searchOwners(
 ): Promise<OwnerSuggestion[] | null> {
   const params = new URLSearchParams();
   if (query) params.set("q", query);
-  try {
-    const response = await fetch(`${resolveApiUrl()}/admin/owners?${params}`, {
-      credentials: "include",
-      signal,
-    });
-    if (!response.ok) return null;
-    const body = (await response.json()) as { owners: OwnerSuggestion[] };
-    return body.owners;
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      return null;
-    }
-    return null;
-  }
+  const response = await request(`/admin/owners?${params}`, { signal });
+  if (!response?.ok) return null;
+  const body = (await response.json()) as { owners: OwnerSuggestion[] };
+  return body.owners;
 }
 
 export async function removeShootingOwner(
   shootingId: string,
   ownerId: string,
 ): Promise<"ok" | "error"> {
-  const response = await fetch(
-    `${resolveApiUrl()}/admin/shootings/${shootingId}/owners/${ownerId}`,
-    { method: "DELETE", credentials: "include" },
+  const response = await request(
+    `/admin/shootings/${shootingId}/owners/${ownerId}`,
+    { method: "DELETE" },
   );
-  if (!response.ok) return "error";
+  if (!response?.ok) return "error";
   return "ok";
 }
 
@@ -177,15 +184,12 @@ export async function addShootingOwner(
   shootingId: string,
   input: { email: string; names?: string[] },
 ): Promise<{ added: string[]; skipped: string[] } | "duplicate" | "error"> {
-  const response = await fetch(
-    `${resolveApiUrl()}/admin/shootings/${shootingId}/owners`,
-    {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: input.email, names: input.names ?? [] }),
-    },
-  );
+  const response = await request(`/admin/shootings/${shootingId}/owners`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: input.email, names: input.names ?? [] }),
+  });
+  if (!response) return "error";
   if (response.status === 409) return "duplicate";
   if (!response.ok) return "error";
   return (await response.json()) as { added: string[]; skipped: string[] };
@@ -195,15 +199,12 @@ export async function addDogs(
   ownerId: string,
   names: string[],
 ): Promise<{ added: string[]; skipped: string[] } | "duplicate" | "error"> {
-  const response = await fetch(
-    `${resolveApiUrl()}/admin/owners/${ownerId}/dogs`,
-    {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ names }),
-    },
-  );
+  const response = await request(`/admin/owners/${ownerId}/dogs`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ names }),
+  });
+  if (!response) return "error";
   if (response.status === 409) return "duplicate";
   if (!response.ok) return "error";
   return (await response.json()) as { added: string[]; skipped: string[] };
@@ -213,16 +214,12 @@ export async function removeDog(
   ownerId: string,
   name: string,
 ): Promise<"ok" | "error"> {
-  const response = await fetch(
-    `${resolveApiUrl()}/admin/owners/${ownerId}/dogs`,
-    {
-      method: "DELETE",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name }),
-    },
-  );
-  if (!response.ok) return "error";
+  const response = await request(`/admin/owners/${ownerId}/dogs`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!response?.ok) return "error";
   return "ok";
 }
 
@@ -231,16 +228,15 @@ export async function deletePhotos(
   ownerId: string,
   photoIds: string[],
 ): Promise<"ok" | "error"> {
-  const response = await fetch(
-    `${resolveApiUrl()}/admin/shootings/${shootingId}/owners/${ownerId}/photos`,
+  const response = await request(
+    `/admin/shootings/${shootingId}/owners/${ownerId}/photos`,
     {
       method: "DELETE",
-      credentials: "include",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ ids: photoIds }),
     },
   );
-  if (!response.ok) return "error";
+  if (!response?.ok) return "error";
   return "ok";
 }
 
@@ -268,11 +264,10 @@ export async function uploadPhotos(
       continue;
     }
 
-    const presign = await fetch(
-      `${resolveApiUrl()}/admin/shootings/${shootingId}/owners/${ownerId}/photos/presign`,
+    const presign = await request(
+      `/admin/shootings/${shootingId}/owners/${ownerId}/photos/presign`,
       {
         method: "POST",
-        credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           contentType: file.type,
@@ -280,6 +275,10 @@ export async function uploadPhotos(
         }),
       },
     );
+    if (!presign) {
+      failures.push({ name: file.name, message: API_UNREACHABLE_MESSAGE });
+      break;
+    }
     if (!presign.ok) {
       const message =
         (await apiErrorMessage(presign)) ??
@@ -295,11 +294,20 @@ export async function uploadPhotos(
       byteSize: number;
     };
 
-    const put = await fetch(signed.url, {
-      method: "PUT",
-      headers: { "content-type": signed.contentType },
-      body: file,
-    });
+    let put: Response;
+    try {
+      put = await fetch(signed.url, {
+        method: "PUT",
+        headers: { "content-type": signed.contentType },
+        body: file,
+      });
+    } catch {
+      failures.push({
+        name: file.name,
+        message: `Envoi impossible pour ${file.name}.`,
+      });
+      continue;
+    }
     if (!put.ok) {
       failures.push({
         name: file.name,
@@ -308,11 +316,10 @@ export async function uploadPhotos(
       continue;
     }
 
-    const confirm = await fetch(
-      `${resolveApiUrl()}/admin/shootings/${shootingId}/owners/${ownerId}/photos`,
+    const confirm = await request(
+      `/admin/shootings/${shootingId}/owners/${ownerId}/photos`,
       {
         method: "POST",
-        credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           objectKey: signed.objectKey,
@@ -321,7 +328,7 @@ export async function uploadPhotos(
         }),
       },
     );
-    if (!confirm.ok) {
+    if (!confirm?.ok) {
       failures.push({
         name: file.name,
         message: `Enregistrement impossible pour ${file.name}.`,
