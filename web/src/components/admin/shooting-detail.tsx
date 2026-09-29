@@ -37,6 +37,7 @@ import {
 import {
   addDogs,
   addShootingOwner,
+  changeOwnerEmail,
   deletePhotos,
   removeDog,
   removeShootingOwner,
@@ -97,7 +98,7 @@ export function ShootingDetail({
     try {
       const result = await run();
       if (result === "duplicate") {
-        toast.error("Ce chien est déjà associé à ce maître.");
+        toast.error("Ce chien est déjà associé à ce participant.");
         return false;
       }
       if (result === "error") {
@@ -117,19 +118,38 @@ export function ShootingDetail({
     try {
       const result = await addShootingOwner(shooting.id, { email });
       if (result === "duplicate") {
-        toast.error("Ce maître est déjà sur ce shooting.");
+        toast.error("Ce participant est déjà sur ce shooting.");
         return false;
       }
       if (result === "error") {
-        toast.error("Impossible d'ajouter le maître.");
+        toast.error("Impossible d'ajouter le participant.");
         return false;
       }
-      toast.success("Maître ajouté.");
+      toast.success("Participant ajouté.");
       onChanged();
       return true;
     } catch {
-      toast.error("Impossible d'ajouter le maître.");
+      toast.error("Impossible d'ajouter le participant.");
       return false;
+    }
+  }
+
+  async function onChangeEmail(ownerId: string, email: string) {
+    const trimmed = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      return "Indique un e-mail valide.";
+    }
+    try {
+      const result = await changeOwnerEmail(shooting.id, ownerId, trimmed);
+      if (result === "taken") {
+        return "Cet e-mail appartient déjà à un autre participant.";
+      }
+      if (result === "error") return "Impossible de modifier l'e-mail.";
+      toast.success("E-mail modifié.");
+      onChanged();
+      return null;
+    } catch {
+      return "Impossible de modifier l'e-mail.";
     }
   }
 
@@ -214,14 +234,14 @@ export function ShootingDetail({
     try {
       const result = await removeShootingOwner(shooting.id, pendingRemove.id);
       if (result === "error") {
-        toast.error("Impossible de retirer le maître.");
+        toast.error("Impossible de retirer le participant.");
         return;
       }
-      toast.success("Maître retiré.");
+      toast.success("Participant retiré.");
       setPendingRemove(null);
       onChanged();
     } catch {
-      toast.error("Impossible de retirer le maître.");
+      toast.error("Impossible de retirer le participant.");
     } finally {
       setRemovingOwnerId(null);
     }
@@ -285,7 +305,7 @@ export function ShootingDetail({
               <Button
                 type="button"
                 size="lg"
-                className="bg-paper text-canvas flex-1 px-3 hover:bg-white sm:flex-none"
+                className="flex-1 px-3 sm:flex-none"
                 onClick={() => setFormOpen(true)}
               >
                 <Plus />
@@ -298,15 +318,15 @@ export function ShootingDetail({
                   <Button
                     type="button"
                     variant="ghost"
-                    size="icon-lg"
+                    size="icon"
                     aria-label="Actions du shooting"
-                    className="text-paper hover:bg-paper/10 hover:text-paper aria-expanded:bg-paper/10 aria-expanded:text-paper ml-auto"
+                    className="text-paper/70 hover:bg-paper/10 hover:text-paper aria-expanded:bg-paper/10 aria-expanded:text-paper ml-auto"
                   />
                 }
               >
                 <Ellipsis />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuContent align="end" className="w-52">
                 <DropdownMenuItem onClick={() => setEditOpen(true)}>
                   <Pencil />
                   Modifier
@@ -330,7 +350,10 @@ export function ShootingDetail({
         </div>
       </div>
 
-      <section className="flex flex-col gap-4" aria-label="Chiens du shooting">
+      <section
+        className="flex flex-col gap-4"
+        aria-label="Participants du shooting"
+      >
         {shooting.archived ? (
           <div
             className={cn(
@@ -341,7 +364,7 @@ export function ShootingDetail({
             <p className="text-sm">
               <span className="font-medium">Shooting archivé.</span>{" "}
               <span className={subtleText}>
-                Les maîtres ne voient plus ces photos.
+                Les participants ne voient plus ces photos.
               </span>
             </p>
             <Button
@@ -361,10 +384,10 @@ export function ShootingDetail({
           <div className={panelClass}>
             {empty ? (
               <div className="px-5 pt-5">
-                <p className="font-medium">Aucun maître pour l'instant</p>
+                <p className="font-medium">Aucun participant pour l'instant</p>
                 <p className={cn("mt-1 max-w-prose text-sm", subtleText)}>
-                  Ajoute un maître par e-mail, puis ses chiens depuis sa ligne.
-                  Il retrouvera ses photos avec cet e-mail.
+                  Ajoute un participant par e-mail, puis ses chiens depuis sa
+                  ligne. Il retrouvera ses photos avec cet e-mail.
                 </p>
               </div>
             ) : null}
@@ -375,7 +398,7 @@ export function ShootingDetail({
                 if (addingNew) return;
                 const email = ownerEmail.trim();
                 if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                  toast.error("Choisis un maître ou saisis son e-mail.");
+                  toast.error("Choisis un participant ou saisis son e-mail.");
                   return;
                 }
                 setAddingNew(true);
@@ -395,7 +418,7 @@ export function ShootingDetail({
                   htmlFor={`new-email-${shooting.id}`}
                   className="text-sm font-medium"
                 >
-                  E-mail du maître
+                  E-mail du participant
                 </label>
                 <OwnerEmailField
                   id={`new-email-${shooting.id}`}
@@ -421,7 +444,7 @@ export function ShootingDetail({
                       setFormOpen(false);
                     }}
                   >
-                    Fermer
+                    Annuler
                   </Button>
                 )}
               </div>
@@ -452,6 +475,7 @@ export function ShootingDetail({
                 onDeletePhotos={(photoIds) =>
                   void onDeletePhotos(owner.id, photoIds)
                 }
+                onChangeEmail={(email) => onChangeEmail(owner.id, email)}
                 onRemove={() => setPendingRemove(owner)}
               />
             ))}
@@ -460,7 +484,7 @@ export function ShootingDetail({
 
         {empty && shooting.archived ? (
           <p className={cn(panelClass, "px-5 py-4 text-sm", subtleText)}>
-            Aucun chien sur ce shooting.
+            Aucun participant sur ce shooting.
           </p>
         ) : null}
       </section>
@@ -528,7 +552,7 @@ export function ShootingDetail({
               disabled={saving}
               onClick={() => setEditOpen(false)}
             >
-              Fermer
+              Annuler
             </Button>
             <Button
               type="submit"
@@ -549,7 +573,7 @@ export function ShootingDetail({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Retirer ce maître ?</DialogTitle>
+            <DialogTitle>Retirer ce participant ?</DialogTitle>
             <DialogDescription>
               {pendingRemove ? removeOwnerMessage(pendingRemove) : ""}
             </DialogDescription>

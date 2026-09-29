@@ -6,6 +6,8 @@ import { withDetails } from "../logger.js";
 import { contentDispositionAttachment } from "../storage.js";
 import { requireStorage } from "../types.js";
 import { normalizeEmail } from "./email.js";
+import { changeOwnerEmail } from "./owner-email.js";
+import { drizzleOwnerEmailPort } from "./owner-email-store.js";
 import {
   photoDownloadFilename,
   photoTitle,
@@ -26,7 +28,7 @@ import {
 } from "./schema.js";
 
 const PHOTO_UPLOAD_REQUIRES_DOG_MESSAGE =
-  "Ajoute au moins un chien à ce maître avant d'importer des photos.";
+  "Ajoute au moins un chien à ce participant avant d'importer des photos.";
 
 const contentTypeSchema = { type: "string", enum: [...PHOTO_CONTENT_TYPES] };
 const dogNamesSchema = {
@@ -526,6 +528,47 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
         .delete(shootingOwners)
         .where(eq(shootingOwners.id, sheet.id));
       return reply.code(204).send();
+    },
+  );
+
+  app.patch<{
+    Params: { shootingId: string; ownerId: string };
+    Body: { email: string };
+  }>(
+    "/shootings/:shootingId/owners/:ownerId",
+    {
+      schema: {
+        params: uuidParams("shootingId", "ownerId"),
+        body: {
+          type: "object",
+          required: ["email"],
+          additionalProperties: false,
+          properties: {
+            email: { type: "string", format: "email", maxLength: 320 },
+          },
+        },
+      },
+    },
+    async (request) => {
+      const result = await changeOwnerEmail(drizzleOwnerEmailPort(app.db), {
+        shootingId: request.params.shootingId,
+        ownerId: request.params.ownerId,
+        email: request.body.email,
+      });
+      if (result.ok) return { email: result.email };
+
+      switch (result.error) {
+        case "invalid-email":
+          throw app.httpErrors.badRequest("invalid email");
+        case "shooting-missing":
+          throw app.httpErrors.notFound("shooting not found");
+        case "owner-missing":
+          throw app.httpErrors.notFound("owner not found");
+        case "archived":
+          throw app.httpErrors.conflict("shooting is archived");
+        case "taken":
+          throw app.httpErrors.conflict("email already used");
+      }
     },
   );
 

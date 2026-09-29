@@ -1,15 +1,27 @@
 import { cn } from "cn";
-import { Ellipsis, ImageUp, Trash2, UserMinus, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { Ellipsis, ImageUp, Pencil, Trash2, UserMinus, X } from "lucide-react";
+import { useRef, useState, type FormEvent } from "react";
 import { photoLabel } from "@/components/admin/format";
 import { PhotoStrip } from "@/components/admin/photo-strip";
-import { panelClass, quietCta, subtleText } from "@/components/admin/styles";
+import {
+  fieldClass,
+  panelClass,
+  quietCta,
+  subtleText,
+} from "@/components/admin/styles";
 import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -32,6 +44,7 @@ type Props = {
   onRemoveDog: (name: string) => void;
   onUpload: (files: File[]) => void;
   onDeletePhotos: (photoIds: string[]) => void;
+  onChangeEmail: (email: string) => Promise<string | null>;
   onRemove: () => void;
 };
 
@@ -53,22 +66,53 @@ export function OwnerRow({
   onRemoveDog,
   onUpload,
   onDeletePhotos,
+  onChangeEmail,
   onRemove,
 }: Props) {
   const [addingDog, setAddingDog] = useState(false);
   const [savingDog, setSavingDog] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailDraft, setEmailDraft] = useState(owner.email);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [savingEmail, setSavingEmail] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const selectEntryRef = useRef<HTMLButtonElement>(null);
   const canImportPhotos = owner.dogs.length > 0;
-  const busy = locked || savingDog || uploading || deletingPhotos || removing;
-  const showPhotoCount = owner.photoCount > 0;
+  const busy =
+    locked ||
+    savingDog ||
+    uploading ||
+    deletingPhotos ||
+    removing ||
+    savingEmail;
+
+  async function onSubmitEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (savingEmail) return;
+    const next = emailDraft.trim().toLowerCase();
+    if (next === owner.email) {
+      setEmailOpen(false);
+      return;
+    }
+    setEmailError(null);
+    setSavingEmail(true);
+    try {
+      const error = await onChangeEmail(emailDraft);
+      if (error) {
+        setEmailError(error);
+        return;
+      }
+      setEmailOpen(false);
+    } finally {
+      setSavingEmail(false);
+    }
+  }
 
   return (
     <li
       className={cn(
         panelClass,
-        "relative flex flex-col gap-4 px-5 py-4 transition-opacity duration-200",
-        showPhotoCount && "pr-12",
+        "flex flex-col gap-4 px-5 py-4 transition-opacity duration-200",
         removing && "opacity-50",
       )}
     >
@@ -152,7 +196,10 @@ export function OwnerRow({
                     aria-label={`Ajouter un chien pour ${owner.email}`}
                     disabled={locked || removing}
                     onClick={() => setAddingDog(true)}
-                    className="border-canvas/45 text-canvas hover:border-canvas/70 hover:bg-canvas/6 focus-visible:ring-canvas/40 inline-flex h-6 items-center rounded-full border border-dashed px-2.5 text-xs font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-40"
+                    className={cn(
+                      quietCta,
+                      "focus-visible:ring-canvas/40 inline-flex h-6 items-center rounded-full border border-dashed px-2.5 text-xs font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-40",
+                    )}
                   >
                     + Ajouter un chien
                   </button>
@@ -188,7 +235,7 @@ export function OwnerRow({
               )}
             >
               <ImageUp />
-              {uploading ? "Envoi…" : "Importer des photos"}
+              {uploading ? "Téléchargement en cours…" : "Importer des photos"}
               {uploading ? null : (
                 <span className="sr-only">
                   {` pour ${listDogs(owner.dogs) || owner.email}`}
@@ -228,6 +275,16 @@ export function OwnerRow({
                 <Ellipsis />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem
+                  onClick={() => {
+                    setEmailDraft(owner.email);
+                    setEmailError(null);
+                    setEmailOpen(true);
+                  }}
+                >
+                  <Pencil />
+                  Modifier l'e-mail
+                </DropdownMenuItem>
                 {owner.photos.length > 0 ? (
                   <DropdownMenuItem
                     variant="destructive"
@@ -237,7 +294,6 @@ export function OwnerRow({
                     Supprimer des photos
                   </DropdownMenuItem>
                 ) : null}
-                {owner.photos.length > 0 ? <DropdownMenuSeparator /> : null}
                 <DropdownMenuItem variant="destructive" onClick={onRemove}>
                   <UserMinus />
                   Retirer du shooting
@@ -247,28 +303,99 @@ export function OwnerRow({
           </div>
         )}
       </div>
-      {showPhotoCount ? (
-        <span
-          aria-label={photoLabel(owner.photoCount)}
-          className={cn(
-            "pointer-events-none absolute bottom-4 right-5 text-sm tabular-nums",
-            subtleText,
-          )}
-        >
-          {owner.photoCount}
-        </span>
-      ) : null}
       {owner.photos.length > 0 ? (
-        <PhotoStrip
-          photos={owner.photos}
-          archived={archived}
-          deleting={deletingPhotos}
-          selectMode={selectMode}
-          idleFocusRef={selectEntryRef}
-          onSelectModeChange={setSelectMode}
-          onDelete={onDeletePhotos}
-        />
+        <div className="flex flex-col gap-2">
+          <p className={cn("type-caption tabular-nums", subtleText)}>
+            {photoLabel(owner.photoCount)}
+          </p>
+          <PhotoStrip
+            photos={owner.photos}
+            archived={archived}
+            deleting={deletingPhotos}
+            selectMode={selectMode}
+            idleFocusRef={selectEntryRef}
+            onSelectModeChange={setSelectMode}
+            onDelete={onDeletePhotos}
+          />
+        </div>
       ) : null}
+      <Dialog
+        open={emailOpen}
+        onOpenChange={(open) => {
+          if (!open && !savingEmail) setEmailOpen(false);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Modifier l'e-mail</DialogTitle>
+            <DialogDescription>
+              Le participant retrouve ses photos avec cette adresse, sur tous
+              ses shootings.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            id={`edit-email-${owner.id}`}
+            className="flex flex-col gap-1.5"
+            onSubmit={(event) => void onSubmitEmail(event)}
+          >
+            <label
+              htmlFor={`owner-email-${owner.id}`}
+              className="text-sm font-medium"
+            >
+              E-mail
+            </label>
+            <input
+              id={`owner-email-${owner.id}`}
+              name="email"
+              type="email"
+              required
+              maxLength={320}
+              autoFocus
+              autoCapitalize="none"
+              autoComplete="off"
+              spellCheck={false}
+              value={emailDraft}
+              disabled={savingEmail}
+              aria-invalid={emailError ? true : undefined}
+              aria-describedby={
+                emailError ? `owner-email-error-${owner.id}` : undefined
+              }
+              onChange={(event) => {
+                setEmailDraft(event.target.value);
+                if (emailError) setEmailError(null);
+              }}
+              className={fieldClass}
+            />
+            {emailError ? (
+              <p
+                id={`owner-email-error-${owner.id}`}
+                role="alert"
+                className="text-destructive text-sm"
+              >
+                {emailError}
+              </p>
+            ) : null}
+          </form>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className={quietCta}
+              disabled={savingEmail}
+              onClick={() => setEmailOpen(false)}
+            >
+              Annuler
+            </Button>
+            <Button
+              type="submit"
+              form={`edit-email-${owner.id}`}
+              disabled={savingEmail}
+            >
+              {savingEmail ? "Modification…" : "Modifier"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </li>
   );
 }

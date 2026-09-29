@@ -6,6 +6,7 @@ import {
   Download,
   Images,
   PawPrint,
+  ShoppingCart,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { formatDate, photoLabel } from "@/components/admin/format";
@@ -161,19 +162,9 @@ export function OwnerPhotos() {
           />
         </a>
         {email ? (
-          <div className="flex items-center gap-3 sm:gap-4">
-            <p className="type-caption text-paper/95 max-w-40 truncate sm:max-w-none">
-              {email}
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              className="border-paper/35 text-paper hover:bg-paper/10 hover:text-paper bg-transparent"
-              onClick={clearEmail}
-            >
-              Retour à l'accueil
-            </Button>
-          </div>
+          <p className="type-caption text-paper/95 max-w-40 truncate sm:max-w-none">
+            {email}
+          </p>
         ) : (
           <a href="/admin" className="admin-link">
             Espace admin
@@ -190,11 +181,23 @@ export function OwnerPhotos() {
           shootingId={shootingId}
           onOpen={(id) => navigate(email, id)}
           onBack={() => navigate(email, null)}
+          onHome={clearEmail}
           onRetry={() => setReload((value) => value + 1)}
         />
       ) : (
         <EmailGate onSubmit={submitEmail} />
       )}
+
+      <a
+        href="https://mozzadogshop.com/"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="bg-paper text-ink shadow-paper hover:bg-paper/95 focus-visible:ring-primary/50 fixed bottom-5 left-5 z-30 inline-flex h-10 items-center gap-2 rounded-lg px-3.5 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2"
+        aria-label="Ouvrir le site Mozza Dog Shop dans un nouvel onglet"
+      >
+        <ShoppingCart className="size-4 shrink-0" aria-hidden="true" />
+        Accéder à la boutique
+      </a>
     </div>
   );
 }
@@ -251,6 +254,7 @@ function GalleryScreen({
   shootingId,
   onOpen,
   onBack,
+  onHome,
   onRetry,
 }: {
   email: string;
@@ -260,6 +264,7 @@ function GalleryScreen({
   shootingId: string | null;
   onOpen: (id: string) => void;
   onBack: () => void;
+  onHome: () => void;
   onRetry: () => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -279,13 +284,18 @@ function GalleryScreen({
     >
       {status === "error" ? (
         <>
-          <h1
-            ref={heading}
-            tabIndex={-1}
-            className="type-display text-paper outline-none"
-          >
-            Vos shootings
-          </h1>
+          <div className="flex flex-col gap-3">
+            <BackLink href="/" onClick={onHome}>
+              Accueil
+            </BackLink>
+            <h1
+              ref={heading}
+              tabIndex={-1}
+              className="type-display text-paper outline-none"
+            >
+              Vos shootings
+            </h1>
+          </div>
           <section className={panelClass}>
             <div className="flex flex-col gap-3 px-5 py-6">
               <p className="font-medium">Le service photo est indisponible.</p>
@@ -304,18 +314,19 @@ function GalleryScreen({
         <>
           <div className="flex flex-col gap-3">
             {many ? (
-              <Button
-                type="button"
-                variant="ghost"
-                className="text-paper hover:bg-paper/10 hover:text-paper -ml-2 w-fit"
+              <BackLink
+                href={`?email=${encodeURIComponent(email)}`}
                 onClick={onBack}
               >
-                <ChevronLeft />
-                Tous les shootings
-              </Button>
-            ) : null}
-            <div className="flex items-start justify-between gap-4">
-              <div className="text-paper flex min-w-0 flex-col gap-1.5">
+                Shootings
+              </BackLink>
+            ) : (
+              <BackLink href="/" onClick={onHome}>
+                Accueil
+              </BackLink>
+            )}
+            <div className="text-paper flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+              <div className="flex min-w-0 flex-col gap-1.5">
                 <h1
                   ref={heading}
                   tabIndex={-1}
@@ -326,19 +337,17 @@ function GalleryScreen({
                 <ShootingFacts shooting={opened} className="text-paper/85" />
               </div>
               {opened.photos.length === 0 ? null : (
-                <div className="flex shrink-0 items-center gap-2">
-                  <Button
-                    nativeButton={false}
-                    render={
-                      <a href={shootingArchiveUrl(email, opened.id)} download />
-                    }
-                    size="lg"
-                    className="bg-paper text-canvas px-3 hover:bg-white"
-                  >
-                    <Download />
-                    Télécharger les photos
-                  </Button>
-                </div>
+                <Button
+                  nativeButton={false}
+                  render={
+                    <a href={shootingArchiveUrl(email, opened.id)} download />
+                  }
+                  size="lg"
+                  className="w-fit shrink-0 px-3"
+                >
+                  <Download />
+                  Télécharger les photos
+                </Button>
               )}
             </div>
           </div>
@@ -356,13 +365,18 @@ function GalleryScreen({
 
       {status !== "error" && showList ? (
         <>
-          <h1
-            ref={heading}
-            tabIndex={-1}
-            className="type-display text-paper outline-none"
-          >
-            Vos shootings
-          </h1>
+          <div className="flex flex-col gap-3">
+            <BackLink href="/" onClick={onHome}>
+              Accueil
+            </BackLink>
+            <h1
+              ref={heading}
+              tabIndex={-1}
+              className="type-display text-paper outline-none"
+            >
+              Vos shootings
+            </h1>
+          </div>
           <section className={panelClass} aria-label="Vos shootings">
             {status === "loading" || shootings === null ? (
               <ListSkeleton />
@@ -420,6 +434,31 @@ function GalleryScreen({
         </>
       ) : null}
     </main>
+  );
+}
+
+function BackLink({
+  href,
+  onClick,
+  children,
+}: {
+  href: string;
+  onClick: () => void;
+  children: string;
+}) {
+  return (
+    <a
+      href={href}
+      className="admin-link inline-flex w-fit items-center gap-1"
+      onClick={(event) => {
+        if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+        event.preventDefault();
+        onClick();
+      }}
+    >
+      <ChevronLeft className="size-4" />
+      {children}
+    </a>
   );
 }
 

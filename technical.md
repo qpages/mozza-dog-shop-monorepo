@@ -38,7 +38,7 @@ Deux modules, pas plus.
 
 ### Espace client (owner)
 
-Quiconque connaît l'email du maître peut lister ses shootings non archivés et obtenir des URLs présignées vers les fichiers.
+Quiconque connaît l'email du participant peut lister ses shootings non archivés et obtenir des URLs présignées vers les fichiers.
 
 C'est **assumé et voulu** pour ce produit : simplicité côté client au détriment d'une authentification forte. Ce n'est ni un oubli de sécurité ni une compromission du backoffice.
 

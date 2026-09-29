@@ -28,7 +28,7 @@ const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 
 export const PHOTO_UPLOAD_REQUIRES_DOG_MESSAGE =
-  "Ajoute au moins un chien à ce maître avant d'importer des photos.";
+  "Ajoute au moins un chien à ce participant avant d'importer des photos.";
 
 export const API_UNREACHABLE_MESSAGE =
   "Une erreur est survenue. Réessaie dans un instant.";
@@ -167,6 +167,28 @@ export async function searchOwners(
   if (!response?.ok) return null;
   const body = (await response.json()) as { owners: OwnerSuggestion[] };
   return body.owners;
+}
+
+export async function changeOwnerEmail(
+  shootingId: string,
+  ownerId: string,
+  email: string,
+): Promise<"ok" | "taken" | "error"> {
+  const response = await request(
+    `/admin/shootings/${shootingId}/owners/${ownerId}`,
+    {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email }),
+    },
+  );
+  if (!response) return "error";
+  if (response.ok) return "ok";
+  if (response.status === 409) {
+    const message = await apiErrorMessage(response);
+    return message === "email already used" ? "taken" : "error";
+  }
+  return "error";
 }
 
 export async function removeShootingOwner(

@@ -123,7 +123,7 @@ export function OwnerEmailField({
                   {item.create ? (
                     <span className="text-canvas inline-flex items-center gap-1 text-xs font-medium">
                       <Plus className="size-3" />
-                      Nouveau maître
+                      Nouveau participant
                     </span>
                   ) : (
                     <span className={cn("truncate text-xs", subtleText)}>
@@ -147,16 +147,16 @@ function emptyCopy(
   hasOwners: boolean,
 ) {
   if (!settled) return "Recherche…";
-  if (alreadyHere) return "Ce maître est déjà sur ce shooting.";
+  if (alreadyHere) return "Ce participant est déjà sur ce shooting.";
   if (!query) {
     return hasOwners
-      ? "Les maîtres connus sont déjà sur ce shooting."
-      : "Aucun maître pour le moment.";
+      ? "Les participants connus sont déjà sur ce shooting."
+      : "Aucun participant pour le moment.";
   }
   if (!isOwnerEmail(query)) {
-    return "Aucun maître correspondant. Saisis un e-mail complet pour en créer un.";
+    return "Aucun participant correspondant. Saisis un e-mail complet pour en créer un.";
   }
-  return "Aucun maître correspondant.";
+  return "Aucun participant correspondant.";
 }
 
 function matchesOwner(owner: OwnerSuggestion, query: string) {

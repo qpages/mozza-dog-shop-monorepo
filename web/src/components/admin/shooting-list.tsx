@@ -51,11 +51,11 @@ export function ShootingList({
           <Button
             type="button"
             size="lg"
-            className="bg-paper text-canvas px-3 hover:bg-white"
+            className="px-3"
             onClick={() => setFormOpen(true)}
           >
             <Plus />
-            Nouveau shooting
+            Ajouter un shooting
           </Button>
         )}
       </div>
@@ -73,7 +73,8 @@ export function ShootingList({
                     : "Aucun shooting en cours"}
                 </p>
                 <p className={cn("mt-1 text-sm", subtleText)}>
-                  Crée un shooting, puis ajoute les chiens et leurs photos.
+                  Crée un shooting, puis ajoute les participants et leurs
+                  photos.
                 </p>
               </div>
             ) : null}
@@ -133,7 +134,7 @@ export function ShootingList({
               </div>
               <div className="flex gap-2">
                 <Button type="submit" size="lg" disabled={creating}>
-                  {creating ? "Création…" : "Créer"}
+                  {creating ? "Ajout…" : "Ajouter"}
                 </Button>
                 {empty ? null : (
                   <Button

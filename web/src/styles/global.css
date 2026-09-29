@@ -15,9 +15,9 @@
   --popover-foreground: oklch(0.147 0.004 49.25);
   --primary: #a55b1b;
   --primary-foreground: #f6f1e6;
-  --canvas: #46704c;
+  --canvas: #5b602a;
   --paper: #f6f1e6;
-  --ink: #101c0e;
+  --ink: #181a07;
   --elevation-paper: 0 18px 40px -22px
     color-mix(in srgb, var(--ink) 45%, transparent);
   --secondary: oklch(0.967 0.001 286.375);
