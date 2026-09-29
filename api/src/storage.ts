@@ -81,30 +81,29 @@ export default fp(
       responseChecksumValidation: "WHEN_REQUIRED",
     });
 
-    // The browser uploads and reads photos directly from the object store,
-    // cross-origin from WEB_ORIGIN. A presigned PUT with a content-type header
-    // triggers a CORS preflight, so the bucket must allow that origin or the
-    // browser blocks the request. Applying the rules on boot keeps the config
-    // in sync with WEB_ORIGIN and survives a store reset (pnpm db:reset).
-    try {
-      await client.send(
-        new PutBucketCorsCommand({
-          Bucket: R2_BUCKET,
-          CORSConfiguration: {
-            CORSRules: [
-              {
-                AllowedOrigins: parseWebOrigins(app.config.WEB_ORIGIN),
-                AllowedMethods: ["GET", "PUT", "HEAD"],
-                AllowedHeaders: ["*"],
-                ExposeHeaders: ["ETag"],
-                MaxAgeSeconds: 3600,
-              },
-            ],
-          },
-        }),
-      );
-    } catch (error) {
-      app.log.warn({ err: error }, "could not apply bucket CORS rules");
+    // Garage is disposable local infrastructure, so restore its CORS policy
+    // after a reset. Production R2 policy is managed separately and the API
+    // must not need permission to mutate bucket configuration.
+    if (R2_ENDPOINT) {
+      try {
+        await client.send(
+          new PutBucketCorsCommand({
+            Bucket: R2_BUCKET,
+            CORSConfiguration: {
+              CORSRules: [
+                {
+                  AllowedOrigins: parseWebOrigins(app.config.WEB_ORIGIN),
+                  AllowedMethods: ["GET", "PUT", "HEAD"],
+                  AllowedHeaders: ["Content-Type"],
+                  MaxAgeSeconds: 3600,
+                },
+              ],
+            },
+          }),
+        );
+      } catch (error) {
+        app.log.warn({ err: error }, "could not configure local bucket CORS");
+      }
     }
 
     const storage: ObjectStorage = {

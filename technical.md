@@ -51,9 +51,9 @@ C'est **assumé et voulu** pour ce produit : simplicité côté client au détri
 Variables API validées au démarrage dans `api/src/app.ts` :
 
 - **`JWT_SECRET`** (obligatoire, ≥ 16 caractères) : secret de signature des cookies admin. En prod, utiliser une valeur longue et aléatoire (générateur de mots de passe ou `openssl rand -base64 32`), jamais la valeur d'exemple de `api/.env.example`.
-- **`WEB_ORIGIN`** (défaut dev : `http://localhost:4321`) : origine(s) CORS autorisée(s) pour le front, séparées par des virgules. En prod, une URL exacte (ex. `https://photos.mozzadogshop.com`), sans wildcard. En dev (`NODE_ENV` ≠ `production`), les origines LAN / Docker (`192.168.x`, `10.x`, `127.x`, `172.16–31.x`) sont aussi acceptées.
+- **`WEB_ORIGIN`** (défaut dev : `http://localhost:4321`) : origines CORS exactes autorisées pour l'API, séparées par des virgules. En dev (`NODE_ENV` ≠ `production`), les origines LAN / Docker (`192.168.x`, `10.x`, `127.x`, `172.16–31.x`) sont aussi acceptées.
 - **`DATABASE_URL`** : Postgres managé côté hébergeur (Coolify, etc.), pas le conteneur du `docker-compose.yml`. Le boot API et `pnpm db:migrate` passent par le même runner (`api/src/migrate.ts`) sur `api/drizzle/`. Échec migrate → exit non-zéro. Seed admin manuel (`node dist/admin/seed.js`).
-- **Stockage objet** : Cloudflare R2 (`R2_ACCOUNT_ID`, clés, bucket). Laisser `R2_ENDPOINT` vide en prod ; Garage n'est que pour le dev local.
+- **Stockage objet** : Cloudflare R2 (`R2_ACCOUNT_ID`, clés, bucket). Laisser `R2_ENDPOINT` vide en prod ; l'API ne modifie jamais la configuration du bucket R2. La policy CORS versionnée dans `deploy/r2-cors.json` doit être appliquée dans R2 → bucket → Settings → CORS Policy. Le wildcard `https://*.quentinpages.dev` couvre les previews sur le domaine maîtrisé. L'origine Coolify `sslip.io` est temporaire et doit rester exacte ; mettre à jour la policy si elle change. Garage est réservé au dev local et sa policy CORS est restaurée automatiquement quand `R2_ENDPOINT` est défini.
 
 ### Docker Compose
 

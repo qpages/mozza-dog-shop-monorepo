@@ -1,0 +1,13 @@
+[
+  {
+    "AllowedOrigins": [
+      "https://photos.mozzadogshop.com",
+      "https://*.quentinpages.dev",
+      "https://jrtk8wsglhqfewll4swuqysl.178.105.134.143.sslip.io"
+    ],
+    "AllowedMethods": ["GET", "PUT", "HEAD"],
+    "AllowedHeaders": ["Content-Type"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
