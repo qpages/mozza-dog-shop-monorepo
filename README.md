@@ -11,12 +11,17 @@ Deux apps : `web` (Astro) et `api` (Fastify).
 
 ## Démarrer
 
+Postgres et Garage (S3 local) passent par Docker Compose, **dev uniquement** :
+
 ```bash
 pnpm install
 cp api/.env.example api/.env
 cp web/.env.example web/.env
+pnpm db:up
 pnpm dev
 ```
+
+`pnpm db:stop` / `pnpm db:down` pour arrêter les conteneurs. Voir `technical.md` (section Exploitation) pour la prod.
 
 - Web : http://localhost:4321
 - API : http://localhost:8787

@@ -33,3 +33,30 @@ Deux modules, pas plus.
 - `db.ts` et `storage.ts` restent hors des modules. Le stockage objet n'est pas nommé d'après le fournisseur dans le domaine.
 - Le web nomme les écrans métier (`owner-photos`). `pages/` suit les URLs. `components/ui/` reste le kit.
 - Le texte visible n'utilise ni le point (`.`), ni le point médian (`·`), ni le tiret (`-`, `–`, `—`) comme séparateur. Relier avec des mots : « Archivé le 26 septembre 2026 ».
+
+## Authentification
+
+### Espace client (owner)
+
+Quiconque connaît l'email du maître peut lister ses shootings non archivés et obtenir des URLs présignées vers les fichiers.
+
+C'est **assumé et voulu** pour ce produit : simplicité côté client au détriment d'une authentification forte. Ce n'est ni un oubli de sécurité ni une compromission du backoffice.
+
+### Espace admin
+
+- Session JWT (cookie), mot de passe, routes `/admin/*` protégées. C'est l'accès fort réservé au photographe et à la gestion métier.
+
+## Exploitation (prod)
+
+Variables API validées au démarrage dans `api/src/app.ts` :
+
+- **`JWT_SECRET`** (obligatoire, ≥ 16 caractères) : secret de signature des cookies admin. En prod, utiliser une valeur longue et aléatoire (générateur de mots de passe ou `openssl rand -base64 32`), jamais la valeur d'exemple de `api/.env.example`.
+- **`WEB_ORIGIN`** (défaut dev : `http://localhost:4321`) : origine(s) CORS autorisée(s) pour le front, séparées par des virgules. En prod, une URL exacte (ex. `https://photos.mozzadogshop.com`), sans wildcard. En dev (`NODE_ENV` ≠ `production`), les origines LAN / Docker (`192.168.x`, `10.x`, `127.x`, `172.16–31.x`) sont aussi acceptées.
+- **`DATABASE_URL`** : Postgres managé côté hébergeur (Coolify, etc.), pas le conteneur du `docker-compose.yml`.
+- **Stockage objet** : Cloudflare R2 (`R2_ACCOUNT_ID`, clés, bucket). Laisser `R2_ENDPOINT` vide en prod ; Garage n'est que pour le dev local.
+
+### Docker Compose
+
+`docker-compose.yml` sert **uniquement au dev local** (`pnpm db:up`). Postgres et Garage y ont des identifiants factices versionnés ; les ports sont publiés sur `127.0.0.1` pour que l'API sur l'hôte puisse s'y connecter sans les exposer sur l'interface publique du serveur.
+
+Ne pas déployer ce fichier sur un VPS : en prod, pas de Postgres/Garage dans Compose ; services managés + secrets dans l'environnement Coolify (ou équivalent).

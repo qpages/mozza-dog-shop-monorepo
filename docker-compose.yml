@@ -4,7 +4,7 @@ services:
     container_name: mozza-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_USER: mozza
       POSTGRES_PASSWORD: mozza
@@ -31,7 +31,7 @@ services:
         "--default-bucket",
       ]
     ports:
-      - "3910:3900"
+      - "127.0.0.1:3910:3900"
     environment:
       GARAGE_DEFAULT_ACCESS_KEY: GK0123456789abcdef0123456789abcd
       GARAGE_DEFAULT_SECRET_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
