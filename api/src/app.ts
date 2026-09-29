@@ -8,6 +8,11 @@ import Fastify from "fastify";
 import { fileURLToPath } from "node:url";
 import { adminRoutes, protectedAdminRoutes } from "./admin/http.js";
 import dbPlugin from "./db.js";
+import {
+  loggerOptions,
+  RequestLogController,
+  resolveLogLevel,
+} from "./logger.js";
 import { createCorsOriginChecker } from "./origins.js";
 import { shootingRoutes } from "./shooting/http.js";
 import storagePlugin from "./storage.js";
@@ -26,6 +31,11 @@ const envSchema = {
     PORT: { type: "integer", default: 8787 },
     HOST: { type: "string", default: "0.0.0.0" },
     NODE_ENV: { type: "string", default: "development" },
+    LOG_LEVEL: {
+      type: "string",
+      default: "info",
+      enum: ["fatal", "error", "warn", "info", "debug", "trace"],
+    },
     R2_ENDPOINT: { type: "string", default: "" },
     R2_REGION: { type: "string", default: "auto" },
     R2_FORCE_PATH_STYLE: { type: "boolean", default: false },
@@ -38,20 +48,15 @@ const envSchema = {
 
 export async function buildApp() {
   const app = Fastify({
-    logger: {
-      redact: {
-        paths: [
-          "password",
-          "req.body.password",
-          "ADMIN_PASSWORD",
-          "config.ADMIN_PASSWORD",
-          "req.headers.authorization",
-          "req.headers.cookie",
-          "res.headers['set-cookie']",
-        ],
-        censor: "[redacted]",
-      },
-    },
+    // Coolify's proxy is the only public ingress. Trust private peers so
+    // request.ip is the client from X-Forwarded-For, not the proxy container.
+    trustProxy: "loopback, linklocal, uniquelocal",
+    logger: loggerOptions,
+    logController: new RequestLogController(),
+  });
+
+  app.addHook("onRequest", async (request, reply) => {
+    reply.header("x-request-id", request.id);
   });
 
   await app.register(env, {
@@ -60,11 +65,13 @@ export async function buildApp() {
       path: fileURLToPath(new URL("../.env", import.meta.url)),
     },
   });
+  app.log.level = resolveLogLevel(app.config.LOG_LEVEL);
   await app.register(sensible);
   await app.register(cors, {
     origin: createCorsOriginChecker(app.config.WEB_ORIGIN, app.config.NODE_ENV),
     credentials: true,
     methods: ["GET", "HEAD", "POST", "PATCH", "DELETE"],
+    exposedHeaders: ["x-request-id"],
   });
   await app.register(cookie);
   await app.register(jwt, {

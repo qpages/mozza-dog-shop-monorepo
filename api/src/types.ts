@@ -9,6 +9,7 @@ export type AppConfig = {
   PORT: number;
   HOST: string;
   NODE_ENV: string;
+  LOG_LEVEL: string;
   R2_ENDPOINT: string;
   R2_REGION: string;
   R2_FORCE_PATH_STYLE: boolean;

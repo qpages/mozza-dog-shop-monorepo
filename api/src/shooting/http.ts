@@ -2,6 +2,7 @@ import { ZipArchive } from "archiver";
 import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { randomUUID } from "node:crypto";
+import { withDetails } from "../logger.js";
 import { contentDispositionAttachment } from "../storage.js";
 import { requireStorage } from "../types.js";
 import { normalizeEmail } from "./email.js";
@@ -692,11 +693,23 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
 
       const stored = await storage.head(objectKey);
       if (!stored) {
-        throw app.httpErrors.badRequest("uploaded object was not found");
+        throw withDetails(
+          app.httpErrors.badRequest("uploaded object was not found"),
+          { objectKey },
+        );
       }
       if (stored.byteSize !== byteSize || stored.contentType !== contentType) {
-        throw app.httpErrors.badRequest(
-          "uploaded object does not match the declared file",
+        throw withDetails(
+          app.httpErrors.badRequest(
+            "uploaded object does not match the declared file",
+          ),
+          {
+            objectKey,
+            declaredByteSize: byteSize,
+            storedByteSize: stored.byteSize,
+            declaredContentType: contentType,
+            storedContentType: stored.contentType ?? null,
+          },
         );
       }
 
