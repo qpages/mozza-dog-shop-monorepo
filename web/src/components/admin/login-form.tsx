@@ -1,6 +1,10 @@
 import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
-import { fieldClass } from "@/components/admin/styles";
+import {
+  fieldClass,
+  touchControlLg,
+  touchIcon,
+} from "@/components/admin/styles";
 import { Button } from "@/components/ui/button";
 import { login } from "@/lib/admin-client";
 
@@ -20,9 +24,11 @@ export function LoginForm({
   const [pending, setPending] = useState(false);
 
   return (
-    <main className="admin-rise mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-5 px-6 pb-16">
+    <main className="admin-rise mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-5 px-6 pb-[max(4rem,env(safe-area-inset-bottom))]">
       <div className="text-paper flex flex-col gap-2 text-center">
-        <h1 className="type-display">Espace admin</h1>
+        <h1 className="type-display max-sm:text-2xl max-sm:leading-tight">
+          Espace admin
+        </h1>
         <p className="type-body text-paper/95">Connexion au backoffice.</p>
       </div>
       <div className="bg-paper shadow-paper rounded-2xl p-5">
@@ -48,7 +54,10 @@ export function LoginForm({
             }
           }}
         >
-          <label htmlFor="admin-email" className="text-sm font-medium">
+          <label
+            htmlFor="admin-email"
+            className="text-base font-medium sm:text-sm"
+          >
             E-mail
           </label>
           <input
@@ -61,7 +70,10 @@ export function LoginForm({
             defaultValue={defaultEmail}
             className={fieldClass}
           />
-          <label htmlFor="admin-password" className="text-sm font-medium">
+          <label
+            htmlFor="admin-password"
+            className="text-base font-medium sm:text-sm"
+          >
             Mot de passe
           </label>
           <div className="relative">
@@ -72,13 +84,13 @@ export function LoginForm({
               required
               autoComplete="current-password"
               defaultValue={defaultPassword}
-              className={`${fieldClass} pr-10`}
+              className={`${fieldClass} pr-11 sm:pr-10`}
             />
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
-              className="absolute right-1 top-1/2 -translate-y-1/2"
+              className={`absolute right-0.5 top-1/2 -translate-y-1/2 ${touchIcon} sm:size-7`}
               aria-label={
                 visible ? "Masquer le mot de passe" : "Afficher le mot de passe"
               }
@@ -89,14 +101,14 @@ export function LoginForm({
             </Button>
           </div>
           {error ? (
-            <p role="alert" className="text-destructive text-sm">
+            <p role="alert" className="text-destructive text-base sm:text-sm">
               {error}
             </p>
           ) : null}
           <Button
             type="submit"
             size="lg"
-            className="mt-2 w-full"
+            className={`mt-2 w-full ${touchControlLg}`}
             disabled={pending}
           >
             {pending ? "Connexion…" : "Connexion"}

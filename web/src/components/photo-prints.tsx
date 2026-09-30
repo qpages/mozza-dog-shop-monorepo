@@ -24,7 +24,14 @@ export function PhotoPrints() {
           }
         >
           <span className="photo-print-frame">
-            <img src={print.src} alt="" />
+            <img
+              src={print.src}
+              alt=""
+              width={176}
+              height={220}
+              loading="lazy"
+              decoding="async"
+            />
           </span>
         </div>
       ))}

@@ -18,6 +18,9 @@ import {
   panelClass,
   quietCta,
   subtleText,
+  touchControl,
+  touchControlLg,
+  touchIcon,
 } from "@/components/admin/styles";
 import { Button } from "@/components/ui/button";
 import {
@@ -283,7 +286,7 @@ export function ShootingDetail({
       <div className="text-paper flex flex-col gap-3">
         <a
           href="/admin"
-          className="admin-link inline-flex w-fit items-center gap-1"
+          className="admin-link inline-flex min-h-11 w-fit touch-manipulation items-center gap-1.5 py-2 text-base sm:min-h-0 sm:py-0 sm:text-sm"
           onClick={(event) => {
             if (event.metaKey || event.ctrlKey || event.shiftKey) return;
             event.preventDefault();
@@ -298,7 +301,7 @@ export function ShootingDetail({
             <h1
               ref={heading}
               tabIndex={-1}
-              className="type-display text-balance outline-none"
+              className="type-display text-balance outline-none max-sm:text-2xl max-sm:leading-tight"
             >
               {shooting.name}
             </h1>
@@ -309,7 +312,7 @@ export function ShootingDetail({
               <Button
                 type="button"
                 size="lg"
-                className="flex-1 px-3 sm:flex-none"
+                className={`flex-1 px-3 sm:flex-none ${touchControlLg}`}
                 onClick={() => setFormOpen(true)}
               >
                 <Plus />
@@ -324,7 +327,7 @@ export function ShootingDetail({
                     variant="ghost"
                     size="icon"
                     aria-label="Actions du shooting"
-                    className="text-paper/70 hover:bg-paper/10 hover:text-paper aria-expanded:bg-paper/10 aria-expanded:text-paper ml-auto"
+                    className={`text-paper/70 hover:bg-paper/10 hover:text-paper aria-expanded:bg-paper/10 aria-expanded:text-paper ml-auto ${touchIcon}`}
                   />
                 }
               >
@@ -374,7 +377,11 @@ export function ShootingDetail({
             <Button
               type="button"
               variant="outline"
-              className={cn(quietCta, "self-start sm:self-auto")}
+              className={cn(
+                quietCta,
+                touchControl,
+                "self-stretch sm:self-auto",
+              )}
               disabled={archiving}
               onClick={() => onArchive(false)}
             >
@@ -420,7 +427,7 @@ export function ShootingDetail({
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                 <label
                   htmlFor={`new-email-${shooting.id}`}
-                  className="text-sm font-medium"
+                  className="text-base font-medium sm:text-sm"
                 >
                   E-mail du participant
                 </label>
@@ -434,8 +441,13 @@ export function ShootingDetail({
                   inputRef={emailRef}
                 />
               </div>
-              <div className="flex gap-2">
-                <Button type="submit" size="lg" disabled={addingNew}>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  type="submit"
+                  size="lg"
+                  disabled={addingNew}
+                  className={`w-full sm:w-auto ${touchControlLg}`}
+                >
                   {addingNew ? "Ajout…" : "Ajouter"}
                 </Button>
                 {empty ? null : (
@@ -443,6 +455,7 @@ export function ShootingDetail({
                     type="button"
                     variant="ghost"
                     size="lg"
+                    className={`w-full sm:w-auto ${touchControlLg}`}
                     onClick={() => {
                       setOwnerEmail("");
                       setFormOpen(false);
@@ -514,7 +527,7 @@ export function ShootingDetail({
             <div className="flex flex-col gap-1.5">
               <label
                 htmlFor={`edit-name-${shooting.id}`}
-                className="text-sm font-medium"
+                className="text-base font-medium sm:text-sm"
               >
                 Nom
               </label>
@@ -533,7 +546,7 @@ export function ShootingDetail({
             <div className="flex flex-col gap-1.5">
               <label
                 htmlFor={`edit-shot-on-${shooting.id}`}
-                className="text-sm font-medium"
+                className="text-base font-medium sm:text-sm"
               >
                 Date
               </label>

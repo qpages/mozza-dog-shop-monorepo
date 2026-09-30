@@ -1,5 +1,6 @@
 import { Download, ExternalLink } from "lucide-react";
 import { useState } from "react";
+import { cn } from "cn";
 import { quietCta } from "@/components/admin/styles";
 import { PhotoLightbox } from "@/components/photo-lightbox";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,7 @@ export function OwnerGallery({ shooting }: Props) {
   return (
     <>
       {shooting.photos.length === 0 ? (
-        <p className="type-caption text-ink/60 py-8 text-center">
+        <p className="type-body text-ink/60 py-8 text-center">
           Les photos de ce shooting n’ont pas encore été mises en ligne.
         </p>
       ) : (
@@ -59,6 +60,7 @@ export function OwnerGallery({ shooting }: Props) {
         onIndexChange={setViewingIndex}
         description="Aperçu de votre photo."
         showUploadedAt={false}
+        mobileHint="Maintiens la photo pour l'enregistrer."
         actions={
           viewing ? (
             <>
@@ -66,7 +68,10 @@ export function OwnerGallery({ shooting }: Props) {
                 type="button"
                 variant="outline"
                 size="sm"
-                className={quietCta}
+                className={cn(
+                  quietCta,
+                  "min-h-11 touch-manipulation text-base sm:min-h-8 sm:text-sm",
+                )}
                 onClick={() => viewPhoto(viewing)}
               >
                 <ExternalLink />
@@ -75,6 +80,7 @@ export function OwnerGallery({ shooting }: Props) {
               <Button
                 type="button"
                 size="sm"
+                className="min-h-11 touch-manipulation text-base sm:min-h-8 sm:text-sm"
                 onClick={() => downloadPhoto(viewing)}
               >
                 <Download />

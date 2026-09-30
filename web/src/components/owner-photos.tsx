@@ -18,10 +18,15 @@ import {
   rowHover,
   subtleText,
 } from "@/components/admin/styles";
+import { SiteMenu } from "@/components/site-menu";
 import { Button } from "@/components/ui/button";
 import {
+  archiveFilenameFromShootingName,
+  canAttemptArchiveShare,
   fetchOwnerGallery,
+  shareArchiveIfPossible,
   shootingArchiveUrl,
+  triggerArchiveDownload,
   type OwnerShooting,
 } from "@/lib/photos-client";
 
@@ -150,9 +155,9 @@ export function OwnerPhotos() {
   }
 
   return (
-    <div className="relative z-10 flex min-h-screen flex-col">
-      <header className="flex items-center justify-between gap-4 px-5 py-4 sm:px-8 sm:py-5">
-        <a href="/" className="admin-logo" aria-label="Mozza Dog Shop">
+    <div className="relative z-10 flex min-h-dvh flex-col">
+      <header className="flex items-center justify-between gap-3 px-5 py-4 pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))] pt-[max(1rem,env(safe-area-inset-top))] sm:gap-4 sm:px-8 sm:py-5 sm:pl-[max(2rem,env(safe-area-inset-left))] sm:pr-[max(2rem,env(safe-area-inset-right))] sm:pt-[max(1.25rem,env(safe-area-inset-top))]">
+        <a href="/" className="admin-logo shrink-0" aria-label="Mozza Dog Shop">
           <img
             src="/logo.png"
             alt=""
@@ -161,15 +166,29 @@ export function OwnerPhotos() {
             className="h-16 w-auto sm:h-20"
           />
         </a>
-        {email ? (
-          <p className="type-caption text-paper/95 max-w-40 truncate sm:max-w-none">
-            {email}
-          </p>
-        ) : (
-          <a href="/admin" className="admin-link">
-            Espace admin
+        <div className="flex min-w-0 items-center gap-0.5 sm:gap-2">
+          <div className="mr-1 hidden min-w-0 sm:block">
+            {email ? (
+              <p className="type-caption text-paper/95 max-w-40 truncate sm:max-w-56 md:max-w-none">
+                {email}
+              </p>
+            ) : (
+              <a href="/admin" className="admin-link">
+                Espace admin
+              </a>
+            )}
+          </div>
+          <a
+            href="https://www.instagram.com/mozza.dog.shop/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Instagram de Mozza Dog Shop"
+            className="text-paper hover:bg-paper/10 focus-visible:ring-paper/50 inline-flex size-11 shrink-0 items-center justify-center rounded-lg transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 sm:size-10"
+          >
+            <InstagramIcon className="size-6 sm:size-5" />
           </a>
-        )}
+          <SiteMenu email={email || null} />
+        </div>
       </header>
 
       {email ? (
@@ -188,26 +207,30 @@ export function OwnerPhotos() {
         <EmailGate onSubmit={submitEmail} />
       )}
 
-      <a
-        href="https://mozzadogshop.com/"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="bg-paper text-ink shadow-paper hover:bg-paper/95 focus-visible:ring-primary/50 fixed bottom-5 left-5 z-30 inline-flex h-10 items-center gap-2 rounded-lg px-3.5 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2"
-        aria-label="Ouvrir le site Mozza Dog Shop dans un nouvel onglet"
-      >
-        <ShoppingCart className="size-4 shrink-0" aria-hidden="true" />
-        Accéder à la boutique
-      </a>
+      {email ? (
+        <a
+          href="https://mozzadogshop.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="bg-paper text-ink shadow-paper hover:bg-paper/95 focus-visible:ring-primary/50 fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-[max(1.25rem,env(safe-area-inset-left))] z-30 hidden min-h-11 touch-manipulation items-center gap-2 rounded-lg px-3.5 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 sm:inline-flex"
+          aria-label="Ouvrir le site Mozza Dog Shop dans un nouvel onglet"
+        >
+          <ShoppingCart className="size-4 shrink-0" aria-hidden="true" />
+          Accéder à la boutique
+        </a>
+      ) : null}
     </div>
   );
 }
 
 function EmailGate({ onSubmit }: { onSubmit: (email: string) => void }) {
   return (
-    <div className="admin-rise flex flex-1 flex-col items-center justify-center gap-10 py-8">
+    <div className="admin-rise flex flex-1 flex-col items-center justify-start gap-8 pb-[max(2rem,env(safe-area-inset-bottom))] pt-2 sm:justify-center sm:gap-10 sm:py-8 sm:pb-8">
       <main className="mx-auto flex w-full max-w-md shrink-0 flex-col gap-5 px-6">
         <div className="text-paper flex flex-col gap-2 text-center">
-          <h1 className="type-display">Vos photos</h1>
+          <h1 className="type-display text-balance max-sm:text-2xl max-sm:leading-tight">
+            Vos photos
+          </h1>
           <p className="type-body text-paper/95">
             Récupérez les clichés de votre shooting avec votre chien.
           </p>
@@ -223,7 +246,7 @@ function EmailGate({ onSubmit }: { onSubmit: (email: string) => void }) {
               onSubmit(value);
             }}
           >
-            <label htmlFor="email" className="text-sm font-medium">
+            <label htmlFor="email" className="text-base font-medium sm:text-sm">
               E-mail du shooting
             </label>
             <input
@@ -232,14 +255,32 @@ function EmailGate({ onSubmit }: { onSubmit: (email: string) => void }) {
               type="email"
               required
               autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="go"
               placeholder="vous@email.com"
-              className={fieldClass}
+              className={cn(fieldClass, "min-h-11 touch-manipulation")}
             />
-            <Button type="submit" size="lg" className="mt-2 w-full">
+            <Button
+              type="submit"
+              size="lg"
+              className="mt-2 min-h-11 w-full touch-manipulation text-base sm:min-h-9 sm:text-sm"
+            >
               Voir mes photos
             </Button>
           </form>
         </div>
+        <a
+          href="https://mozzadogshop.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="bg-paper text-ink shadow-paper hover:bg-paper/95 focus-visible:ring-primary/50 inline-flex min-h-11 w-full touch-manipulation items-center justify-center gap-2 rounded-lg px-3.5 text-base font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 sm:text-sm"
+          aria-label="Ouvrir le site Mozza Dog Shop dans un nouvel onglet"
+        >
+          <ShoppingCart className="size-4 shrink-0" aria-hidden="true" />
+          Accéder à la boutique
+        </a>
       </main>
       <PhotoPrints />
     </div>
@@ -278,7 +319,7 @@ function GalleryScreen({
   return (
     <main
       className={cn(
-        "admin-rise mx-auto flex w-full flex-1 flex-col gap-6 px-6 pb-16 pt-4",
+        "admin-rise mx-auto flex w-full flex-1 flex-col gap-6 px-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4",
         opened ? "max-w-5xl" : "max-w-3xl",
       )}
     >
@@ -291,18 +332,24 @@ function GalleryScreen({
             <h1
               ref={heading}
               tabIndex={-1}
-              className="type-display text-paper outline-none"
+              className="type-display text-paper text-balance outline-none max-sm:text-2xl max-sm:leading-tight"
             >
               Vos shootings
             </h1>
           </div>
           <section className={panelClass}>
             <div className="flex flex-col gap-3 px-5 py-6">
-              <p className="font-medium">Le service photo est indisponible.</p>
+              <p className="text-base font-medium">
+                Le service photo est indisponible.
+              </p>
               <p className={cn("text-sm", subtleText)}>
                 Réessayez dans un instant.
               </p>
-              <Button type="button" className="w-fit" onClick={onRetry}>
+              <Button
+                type="button"
+                className="min-h-11 w-fit touch-manipulation px-3.5 text-base sm:min-h-8 sm:text-sm"
+                onClick={onRetry}
+              >
                 Réessayer
               </Button>
             </div>
@@ -330,24 +377,17 @@ function GalleryScreen({
                 <h1
                   ref={heading}
                   tabIndex={-1}
-                  className="type-display text-balance outline-none"
+                  className="type-display text-balance outline-none max-sm:text-2xl max-sm:leading-tight"
                 >
                   {opened.name}
                 </h1>
                 <ShootingFacts shooting={opened} className="text-paper/85" />
               </div>
               {opened.photos.length === 0 ? null : (
-                <Button
-                  nativeButton={false}
-                  render={
-                    <a href={shootingArchiveUrl(email, opened.id)} download />
-                  }
-                  size="lg"
-                  className="w-fit shrink-0 px-3"
-                >
-                  <Download />
-                  Télécharger les photos
-                </Button>
+                <ArchiveDownloadLink
+                  href={shootingArchiveUrl(email, opened.id)}
+                  shootingName={opened.name}
+                />
               )}
             </div>
           </div>
@@ -372,7 +412,7 @@ function GalleryScreen({
             <h1
               ref={heading}
               tabIndex={-1}
-              className="type-display text-paper outline-none"
+              className="type-display text-paper text-balance outline-none max-sm:text-2xl max-sm:leading-tight"
             >
               Vos shootings
             </h1>
@@ -384,8 +424,10 @@ function GalleryScreen({
 
             {status === "idle" && shootings && shootings.length === 0 ? (
               <div className="px-5 py-6">
-                <p className="font-medium">Aucune photo pour cet e-mail</p>
-                <p className={cn("mt-1 text-sm", subtleText)}>
+                <p className="text-base font-medium">
+                  Aucune photo pour cet e-mail
+                </p>
+                <p className={cn("mt-1 text-sm leading-normal", subtleText)}>
                   Aucun shooting n’est lié à{" "}
                   <span className="text-foreground font-medium">{email}</span>{" "}
                   pour l’instant.
@@ -406,12 +448,12 @@ function GalleryScreen({
                         onOpen(shooting.id);
                       }}
                       className={cn(
-                        "group flex items-center gap-4 px-5 py-4",
+                        "group flex min-h-11 touch-manipulation items-center gap-4 px-5 py-3.5",
                         rowHover,
                       )}
                     >
                       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                        <p className="truncate font-medium leading-5">
+                        <p className="truncate text-base font-medium leading-snug sm:text-sm sm:leading-5">
                           {shooting.name}
                         </p>
                         <ShootingFacts
@@ -437,6 +479,68 @@ function GalleryScreen({
   );
 }
 
+function ArchiveDownloadLink({
+  href,
+  shootingName,
+}: {
+  href: string;
+  shootingName: string;
+}) {
+  const [preparing, setPreparing] = useState(false);
+
+  return (
+    <Button
+      nativeButton={false}
+      disabled={preparing}
+      render={
+        <a
+          href={href}
+          download
+          aria-busy={preparing || undefined}
+          onClick={(event) => {
+            if (
+              event.metaKey ||
+              event.ctrlKey ||
+              event.shiftKey ||
+              event.altKey ||
+              event.button !== 0
+            ) {
+              return;
+            }
+            if (preparing) {
+              event.preventDefault();
+              return;
+            }
+            // Desktop / no file-share: keep a normal download without busy state.
+            if (!canAttemptArchiveShare()) return;
+            event.preventDefault();
+            void (async () => {
+              setPreparing(true);
+              try {
+                const result = await shareArchiveIfPossible({
+                  url: href,
+                  fallbackFilename:
+                    archiveFilenameFromShootingName(shootingName),
+                  title: shootingName,
+                });
+                if (result === "aborted" || result === "shared") return;
+                triggerArchiveDownload(href);
+              } finally {
+                setPreparing(false);
+              }
+            })();
+          }}
+        />
+      }
+      size="lg"
+      className="min-h-11 w-full shrink-0 touch-manipulation px-3.5 text-base sm:min-h-9 sm:w-fit sm:text-sm"
+    >
+      <Download />
+      {preparing ? "Préparation…" : "Tout télécharger (ZIP)"}
+    </Button>
+  );
+}
+
 function BackLink({
   href,
   onClick,
@@ -449,16 +553,37 @@ function BackLink({
   return (
     <a
       href={href}
-      className="admin-link inline-flex w-fit items-center gap-1"
+      className="admin-link inline-flex min-h-11 w-fit touch-manipulation items-center gap-1.5 py-2 text-base sm:text-sm"
       onClick={(event) => {
         if (event.metaKey || event.ctrlKey || event.shiftKey) return;
         event.preventDefault();
         onClick();
       }}
     >
-      <ChevronLeft className="size-4" />
+      <ChevronLeft className="size-4 shrink-0" aria-hidden="true" />
       {children}
     </a>
+  );
+}
+
+/** Lucide-style Instagram mark — brand icons were removed from lucide-react. */
+function InstagramIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+    </svg>
   );
 }
 

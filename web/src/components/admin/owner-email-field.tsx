@@ -97,7 +97,7 @@ export function OwnerEmailField({
           type="button"
           disabled={disabled}
           aria-label="Afficher les maîtres"
-          className="text-ink/50 hover:bg-canvas/10 focus-visible:ring-canvas/40 group absolute right-1 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-md transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-40"
+          className="text-ink/50 hover:bg-canvas/10 focus-visible:ring-canvas/40 group absolute right-0.5 top-1/2 grid size-11 -translate-y-1/2 touch-manipulation place-items-center rounded-md transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-40 sm:right-1 sm:size-7"
         >
           <ChevronDown className="group-data-popup-open:rotate-180 size-4 transition-transform duration-200" />
         </Combobox.Trigger>
@@ -108,8 +108,13 @@ export function OwnerEmailField({
           align="start"
           className="isolate z-50 outline-none"
         >
-          <Combobox.Popup className="bg-popover text-popover-foreground ring-foreground/10 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 w-(--anchor-width) origin-(--transform-origin) z-50 max-h-64 overflow-y-auto rounded-lg p-1 shadow-md outline-none ring-1 duration-100">
-            <Combobox.Empty className={cn("px-2.5 py-2 text-sm", subtleText)}>
+          <Combobox.Popup className="bg-popover text-popover-foreground ring-foreground/10 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 w-(--anchor-width) origin-(--transform-origin) z-50 max-h-64 overflow-y-auto overscroll-contain rounded-lg p-1 shadow-md outline-none ring-1 duration-100">
+            <Combobox.Empty
+              className={cn(
+                "px-3 py-2.5 text-base sm:px-2.5 sm:py-2 sm:text-sm",
+                subtleText,
+              )}
+            >
               {emptyCopy(query, settled, alreadyHere, owners.length > 0)}
             </Combobox.Empty>
             <Combobox.List>
@@ -117,16 +122,18 @@ export function OwnerEmailField({
                 <Combobox.Item
                   key={item.id}
                   value={item}
-                  className="data-highlighted:bg-canvas/10 flex cursor-default select-none flex-col gap-0.5 rounded-md px-2.5 py-1.5 text-sm outline-none"
+                  className="data-highlighted:bg-canvas/10 flex min-h-11 cursor-default touch-manipulation select-none flex-col justify-center gap-0.5 rounded-md px-3 py-2.5 text-base outline-none sm:min-h-0 sm:px-2.5 sm:py-1.5 sm:text-sm"
                 >
                   <span className="truncate font-medium">{item.email}</span>
                   {item.create ? (
-                    <span className="text-canvas inline-flex items-center gap-1 text-xs font-medium">
+                    <span className="text-canvas inline-flex items-center gap-1 text-sm font-medium sm:text-xs">
                       <Plus className="size-3" />
                       Nouveau participant
                     </span>
                   ) : (
-                    <span className={cn("truncate text-xs", subtleText)}>
+                    <span
+                      className={cn("truncate text-sm sm:text-xs", subtleText)}
+                    >
                       {dogLine(item.dogs)}
                     </span>
                   )}

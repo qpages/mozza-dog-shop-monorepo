@@ -38,6 +38,8 @@ type Props = {
   onIndexChange: (index: number | null) => void;
   description: string;
   actions?: ReactNode;
+  /** Mobile-only hint (e.g. long-press to save). Hidden from `sm` up. */
+  mobileHint?: string;
   showUploadedAt?: boolean;
 };
 
@@ -47,6 +49,7 @@ export function PhotoLightbox({
   onIndexChange,
   description,
   actions,
+  mobileHint,
   showUploadedAt = true,
 }: Props) {
   const viewing = index !== null ? (photos[index] ?? null) : null;
@@ -105,7 +108,7 @@ export function PhotoLightbox({
         className={cn(
           // Fixed viewport frame — size never follows the image.
           // Override DialogContent defaults (w-full / sm:max-w-sm) at every breakpoint.
-          "bg-paper text-ink ring-ink/10 shadow-paper flex max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none",
+          "bg-paper text-ink ring-ink/10 shadow-paper flex max-h-none max-w-none flex-col gap-0 overflow-hidden p-0 pb-0 pt-0 text-sm sm:max-w-none",
           // Mobile: nearly full screen (small inset only).
           "h-[calc(100dvh-0.75rem)] w-[calc(100vw-0.75rem)] rounded-xl",
           // Desktop: large stable frame with a calm margin.
@@ -126,7 +129,7 @@ export function PhotoLightbox({
               <img
                 src={viewing.url}
                 alt=""
-                className="absolute inset-0 size-full object-contain"
+                className="absolute inset-0 size-full select-auto object-contain [-webkit-touch-callout:default]"
               />
 
               <DialogClose
@@ -218,6 +221,13 @@ export function PhotoLightbox({
                     </p>
                   ) : null}
                 </div>
+                {mobileHint ? (
+                  <p
+                    className={cn("text-sm leading-snug sm:hidden", subtleText)}
+                  >
+                    {mobileHint}
+                  </p>
+                ) : null}
               </div>
 
               <div className="flex w-full flex-col gap-2.5 sm:w-auto sm:shrink-0 sm:flex-row sm:items-center sm:justify-end">

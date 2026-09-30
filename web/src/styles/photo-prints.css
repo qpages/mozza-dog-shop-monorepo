@@ -39,6 +39,34 @@
   object-position: 24% center;
 }
 
+@media (max-width: 639px) {
+  .photo-prints {
+    display: flex;
+    width: 100%;
+    max-width: none;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-inline: 1.25rem;
+    padding-block: 0.5rem 1.25rem;
+  }
+
+  .photo-prints::-webkit-scrollbar {
+    display: none;
+  }
+
+  .photo-print {
+    flex: 0 0 42%;
+    width: 42%;
+    margin-inline: 0;
+    scroll-snap-align: start;
+  }
+}
+
 @media (hover: hover) {
   .photo-print:hover {
     transform: rotate(calc(var(--r) * 0.15)) translateY(var(--y));
@@ -48,5 +76,9 @@
 @media (prefers-reduced-motion: reduce) {
   .photo-print {
     transition: none;
+  }
+
+  .photo-prints {
+    scroll-behavior: auto;
   }
 }

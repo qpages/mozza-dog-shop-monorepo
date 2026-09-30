@@ -3,8 +3,8 @@ import { OwnerPhotos } from "@/components/owner-photos";
 import Layout from "@/layouts/main.astro";
 ---
 
-<Layout title="Vos photos, Mozza Dog Shop">
-  <div class="bg-canvas relative flex min-h-screen flex-col">
+<Layout title="Vos photos, Mozza Dog Shop" coverViewport>
+  <div class="bg-canvas relative flex min-h-dvh flex-col">
     <div
       class="pointer-events-none absolute inset-0 opacity-40"
       style="background-image: radial-gradient(rgba(255,255,255,0.16) 0.6px, transparent 0.6px); background-size: 3px 3px;"
@@ -29,8 +29,14 @@ import Layout from "@/layouts/main.astro";
 
   :global(.admin-link) {
     position: relative;
-    font-size: 0.875rem;
+    font-size: 1rem;
     color: var(--paper);
+  }
+
+  @media (min-width: 640px) {
+    :global(.admin-link) {
+      font-size: 0.875rem;
+    }
   }
 
   :global(.admin-link::after) {

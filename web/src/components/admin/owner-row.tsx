@@ -8,6 +8,8 @@ import {
   panelClass,
   quietCta,
   subtleText,
+  touchControl,
+  touchIcon,
 } from "@/components/admin/styles";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -127,8 +129,8 @@ export function OwnerRow({
               <li
                 key={dog}
                 className={cn(
-                  "bg-canvas/10 text-ink inline-flex h-6 items-center rounded-full text-xs font-medium transition-opacity duration-200",
-                  archived ? "px-2.5" : "pl-2.5 pr-0.5",
+                  "bg-canvas/10 text-ink inline-flex min-h-11 items-center rounded-full text-base font-medium transition-opacity duration-200 sm:min-h-6 sm:text-xs",
+                  archived ? "px-3 sm:px-2.5" : "pl-3 pr-0.5 sm:pl-2.5",
                   removingDog === dog && "opacity-50",
                 )}
               >
@@ -139,9 +141,9 @@ export function OwnerRow({
                     aria-label={`Retirer ${dog}`}
                     disabled={locked || savingDog || removing}
                     onClick={() => onRemoveDog(dog)}
-                    className="text-ink/55 hover:bg-canvas/15 hover:text-ink focus-visible:ring-canvas/40 ml-0.5 grid size-5 place-items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-40"
+                    className="text-ink/55 hover:bg-canvas/15 hover:text-ink focus-visible:ring-canvas/40 ml-0.5 grid size-11 touch-manipulation place-items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-40 sm:size-5"
                   >
-                    <X className="size-3" />
+                    <X className="size-4 sm:size-3" />
                   </button>
                 )}
               </li>
@@ -187,7 +189,7 @@ export function OwnerRow({
                           setAddingDog(false);
                         }
                       }}
-                      className="bg-background placeholder:text-muted-foreground focus-visible:ring-3 border-canvas/40 focus-visible:border-canvas focus-visible:ring-canvas/15 h-6 w-40 rounded-full border px-3 text-xs outline-none transition-[border-color,box-shadow] duration-200"
+                      className="bg-background placeholder:text-muted-foreground focus-visible:ring-3 border-canvas/40 focus-visible:border-canvas focus-visible:ring-canvas/15 h-11 min-h-11 w-44 touch-manipulation rounded-full border px-3 text-base outline-none transition-[border-color,box-shadow] duration-200 sm:h-6 sm:min-h-6 sm:w-40 sm:text-xs"
                     />
                   </form>
                 ) : (
@@ -198,7 +200,7 @@ export function OwnerRow({
                     onClick={() => setAddingDog(true)}
                     className={cn(
                       quietCta,
-                      "focus-visible:ring-canvas/40 inline-flex h-6 items-center rounded-full border border-dashed px-2.5 text-xs font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-40",
+                      "focus-visible:ring-canvas/40 inline-flex min-h-11 touch-manipulation items-center rounded-full border border-dashed px-3 text-base font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-40 sm:min-h-6 sm:px-2.5 sm:text-xs",
                     )}
                   >
                     + Ajouter un chien
@@ -214,7 +216,7 @@ export function OwnerRow({
           ) : null}
         </div>
         {archived ? null : (
-          <div className="flex shrink-0 items-center gap-2 sm:justify-end">
+          <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0 sm:justify-end">
             <label
               aria-disabled={
                 uploadLocked ||
@@ -229,7 +231,8 @@ export function OwnerRow({
               className={cn(
                 buttonVariants({ variant: "outline" }),
                 quietCta,
-                "has-focus-visible:ring-3 has-focus-visible:ring-canvas/25 cursor-pointer",
+                touchControl,
+                "has-focus-visible:ring-3 has-focus-visible:ring-canvas/25 flex-1 cursor-pointer justify-center sm:flex-none",
                 (uploadLocked || selectMode || removing || !canImportPhotos) &&
                   "border-canvas/30 bg-canvas/8 text-canvas/55 hover:bg-canvas/8 hover:text-canvas/55 pointer-events-none cursor-not-allowed",
               )}
@@ -268,7 +271,7 @@ export function OwnerRow({
                     size="icon"
                     disabled={busy}
                     aria-label={`Actions de ${owner.email}`}
-                    className="text-ink/55 hover:bg-canvas/10 hover:text-ink aria-expanded:bg-canvas/10 aria-expanded:text-ink"
+                    className={`text-ink/55 hover:bg-canvas/10 hover:text-ink aria-expanded:bg-canvas/10 aria-expanded:text-ink ${touchIcon}`}
                   />
                 }
               >
@@ -340,7 +343,7 @@ export function OwnerRow({
           >
             <label
               htmlFor={`owner-email-${owner.id}`}
-              className="text-sm font-medium"
+              className="text-base font-medium sm:text-sm"
             >
               E-mail
             </label>

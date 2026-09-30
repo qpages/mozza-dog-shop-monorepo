@@ -2,7 +2,7 @@ import { cn } from "cn";
 import { Check } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { PhotoLightbox } from "@/components/photo-lightbox";
-import { quietCta, subtleText } from "@/components/admin/styles";
+import { quietCta, subtleText, touchControl } from "@/components/admin/styles";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -106,12 +106,12 @@ export function PhotoStrip({
                 : `${count} sélectionnée${count > 1 ? "s" : ""}`}
             </span>
           </span>
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-1">
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="text-ink/70 hover:bg-canvas/10 hover:text-ink"
+              className={`text-ink/70 hover:bg-canvas/10 hover:text-ink w-full justify-center sm:w-auto ${touchControl}`}
               onClick={() =>
                 setSelected(
                   allSelected
@@ -134,7 +134,7 @@ export function PhotoStrip({
               variant="ghost"
               size="sm"
               data-select-cancel
-              className="text-ink/70 hover:bg-canvas/10 hover:text-ink"
+              className={`text-ink/70 hover:bg-canvas/10 hover:text-ink w-full justify-center sm:w-auto ${touchControl}`}
               onClick={exitSelect}
             >
               Annuler
@@ -144,6 +144,7 @@ export function PhotoStrip({
               variant="destructive"
               size="sm"
               disabled={count === 0 || deleting}
+              className={`w-full justify-center sm:w-auto ${touchControl}`}
               onClick={openConfirm}
             >
               {deleting ? "Suppression…" : "Supprimer"}

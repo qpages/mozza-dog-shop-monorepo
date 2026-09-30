@@ -9,6 +9,7 @@ import {
   panelClass,
   rowHover,
   subtleText,
+  touchControlLg,
 } from "@/components/admin/styles";
 import { Button } from "@/components/ui/button";
 import { createShooting, type Shooting } from "@/lib/admin-client";
@@ -43,15 +44,19 @@ export function ShootingList({
 
   return (
     <>
-      <div className="text-paper flex items-center justify-between gap-4">
-        <h1 ref={heading} tabIndex={-1} className="type-display outline-none">
+      <div className="text-paper flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <h1
+          ref={heading}
+          tabIndex={-1}
+          className="type-display outline-none max-sm:text-2xl max-sm:leading-tight"
+        >
           Shootings
         </h1>
         {loading || showForm ? null : (
           <Button
             type="button"
             size="lg"
-            className="px-3"
+            className={`w-full px-3 sm:w-auto ${touchControlLg}`}
             onClick={() => setFormOpen(true)}
           >
             <Plus />
@@ -105,7 +110,10 @@ export function ShootingList({
               }}
             >
               <div className="flex flex-[1.4] flex-col gap-1.5">
-                <label htmlFor="shooting-name" className="text-sm font-medium">
+                <label
+                  htmlFor="shooting-name"
+                  className="text-base font-medium sm:text-sm"
+                >
                   Nom
                 </label>
                 <input
@@ -120,7 +128,10 @@ export function ShootingList({
                 />
               </div>
               <div className="flex flex-1 flex-col gap-1.5">
-                <label htmlFor="shot-on" className="text-sm font-medium">
+                <label
+                  htmlFor="shot-on"
+                  className="text-base font-medium sm:text-sm"
+                >
                   Date
                 </label>
                 <input
@@ -132,8 +143,13 @@ export function ShootingList({
                   className={fieldClass}
                 />
               </div>
-              <div className="flex gap-2">
-                <Button type="submit" size="lg" disabled={creating}>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  type="submit"
+                  size="lg"
+                  disabled={creating}
+                  className={`w-full sm:w-auto ${touchControlLg}`}
+                >
                   {creating ? "Ajout…" : "Ajouter"}
                 </Button>
                 {empty ? null : (
@@ -141,6 +157,7 @@ export function ShootingList({
                     type="button"
                     variant="ghost"
                     size="lg"
+                    className={`w-full sm:w-auto ${touchControlLg}`}
                     onClick={() => setFormOpen(false)}
                   >
                     Annuler
@@ -170,7 +187,7 @@ export function ShootingList({
             type="button"
             aria-expanded={showArchived}
             onClick={() => onShowArchivedChange(!showArchived)}
-            className="text-paper focus-visible:ring-paper/60 inline-flex w-fit items-center gap-1.5 rounded-md text-sm font-medium focus-visible:outline-none focus-visible:ring-2"
+            className="text-paper focus-visible:ring-paper/60 inline-flex min-h-11 w-fit touch-manipulation items-center gap-1.5 rounded-md py-2 text-base font-medium focus-visible:outline-none focus-visible:ring-2 sm:min-h-0 sm:py-0 sm:text-sm"
           >
             <ChevronRight
               className={cn(
@@ -220,7 +237,10 @@ function ShootingLink({
       <a
         href={`?shooting=${shooting.id}`}
         onClick={onClick}
-        className={cn("group flex items-center gap-4 px-5 py-4", rowHover)}
+        className={cn(
+          "group flex min-h-11 touch-manipulation items-center gap-4 px-5 py-3.5 sm:min-h-0 sm:py-4",
+          rowHover,
+        )}
       >
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <p className="truncate font-medium leading-5">{shooting.name}</p>

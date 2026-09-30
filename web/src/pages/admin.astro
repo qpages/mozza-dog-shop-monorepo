@@ -40,7 +40,7 @@ function readDevAdmin() {
 ---
 
 <Layout title="Espace admin, Mozza Dog Shop">
-  <div class="bg-canvas relative flex min-h-screen flex-col">
+  <div class="bg-canvas relative flex min-h-dvh flex-col">
     <div
       class="pointer-events-none absolute inset-0 opacity-40"
       style="background-image: radial-gradient(rgba(255,255,255,0.16) 0.6px, transparent 0.6px); background-size: 3px 3px;"
@@ -69,8 +69,14 @@ function readDevAdmin() {
 
   :global(.admin-link) {
     position: relative;
-    font-size: 0.875rem;
+    font-size: 1rem;
     color: var(--paper);
+  }
+
+  @media (min-width: 640px) {
+    :global(.admin-link) {
+      font-size: 0.875rem;
+    }
   }
 
   :global(.admin-link::after) {

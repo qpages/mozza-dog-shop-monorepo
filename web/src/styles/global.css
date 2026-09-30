@@ -137,6 +137,13 @@
   html {
     @apply font-sans;
   }
+  a,
+  button,
+  [role="button"],
+  input,
+  label {
+    touch-action: manipulation;
+  }
 }
 
 @utility type-display {

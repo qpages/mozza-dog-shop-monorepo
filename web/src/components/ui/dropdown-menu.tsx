@@ -65,7 +65,7 @@ function DropdownMenuLabel({
       data-slot="dropdown-menu-label"
       data-inset={inset}
       className={cn(
-        "text-ink/55 data-inset:pl-7 px-1.5 py-1 text-xs font-medium",
+        "text-ink/55 data-inset:pl-7 px-3 py-2 text-sm font-medium sm:px-1.5 sm:py-1 sm:text-xs",
         className,
       )}
       {...props}
@@ -88,7 +88,7 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "group/dropdown-menu-item focus:bg-canvas/10 focus:text-ink not-data-[variant=destructive]:focus:**:text-ink data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50 data-[variant=destructive]:*:[svg]:text-destructive relative flex cursor-default select-none items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "group/dropdown-menu-item focus:bg-canvas/10 focus:text-ink not-data-[variant=destructive]:focus:**:text-ink data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive data-disabled:pointer-events-none data-disabled:opacity-50 data-[variant=destructive]:*:[svg]:text-destructive relative flex min-h-11 cursor-default touch-manipulation select-none items-center gap-2 rounded-md px-3 py-2.5 text-base outline-none sm:min-h-8 sm:gap-1.5 sm:px-1.5 sm:py-1 sm:text-sm [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         className,
       )}
       {...props}
@@ -113,7 +113,7 @@ function DropdownMenuSubTrigger({
       data-slot="dropdown-menu-sub-trigger"
       data-inset={inset}
       className={cn(
-        "focus:bg-canvas/10 focus:text-ink data-inset:pl-7 data-popup-open:bg-canvas/10 data-popup-open:text-ink data-open:bg-canvas/10 data-open:text-ink flex cursor-default select-none items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "focus:bg-canvas/10 focus:text-ink data-inset:pl-7 data-popup-open:bg-canvas/10 data-popup-open:text-ink data-open:bg-canvas/10 data-open:text-ink flex min-h-11 cursor-default touch-manipulation select-none items-center gap-2 rounded-md px-3 py-2.5 text-base outline-none sm:min-h-8 sm:gap-1.5 sm:px-1.5 sm:py-1 sm:text-sm [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         className,
       )}
       {...props}
@@ -162,7 +162,7 @@ function DropdownMenuCheckboxItem({
       data-slot="dropdown-menu-checkbox-item"
       data-inset={inset}
       className={cn(
-        "focus:bg-canvas/10 focus:text-ink focus:**:text-ink data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 relative flex cursor-default select-none items-center gap-1.5 rounded-md py-1 pl-1.5 pr-8 text-sm outline-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "focus:bg-canvas/10 focus:text-ink focus:**:text-ink data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 relative flex min-h-11 cursor-default touch-manipulation select-none items-center gap-2 rounded-md py-2.5 pl-3 pr-8 text-base outline-none sm:min-h-8 sm:gap-1.5 sm:py-1 sm:pl-1.5 sm:text-sm [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         className,
       )}
       checked={checked}
@@ -203,7 +203,7 @@ function DropdownMenuRadioItem({
       data-slot="dropdown-menu-radio-item"
       data-inset={inset}
       className={cn(
-        "focus:bg-canvas/10 focus:text-ink focus:**:text-ink data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 relative flex cursor-default select-none items-center gap-1.5 rounded-md py-1 pl-1.5 pr-8 text-sm outline-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "focus:bg-canvas/10 focus:text-ink focus:**:text-ink data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 relative flex min-h-11 cursor-default touch-manipulation select-none items-center gap-2 rounded-md py-2.5 pl-3 pr-8 text-base outline-none sm:min-h-8 sm:gap-1.5 sm:py-1 sm:pl-1.5 sm:text-sm [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         className,
       )}
       {...props}

@@ -151,7 +151,7 @@ export function ShootingsScreen() {
 
   return (
     <>
-      <main className="admin-rise mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 pb-16 pt-4">
+      <main className="admin-rise mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-5 pb-[max(4rem,env(safe-area-inset-bottom))] pt-4 sm:px-6">
         {opened ? (
           <ShootingDetail
             key={opened.id}
