@@ -3,6 +3,12 @@ import { readFileSync } from "node:fs";
 import { AdminApp } from "@/components/admin-app";
 import Layout from "@/layouts/main.astro";
 
+interface Props {
+  title: string;
+  screen?: "shootings" | "claims";
+}
+
+const { title, screen = "shootings" } = Astro.props;
 const devAdmin = readDevAdmin();
 
 function readDevAdmin() {
@@ -39,7 +45,7 @@ function readDevAdmin() {
 }
 ---
 
-<Layout title="Espace admin, Mozza Dog Shop">
+<Layout title={title}>
   <div class="bg-canvas relative flex min-h-dvh flex-col">
     <div
       class="pointer-events-none absolute inset-0 opacity-40"
@@ -49,6 +55,7 @@ function readDevAdmin() {
     </div>
     <AdminApp
       client:load
+      screen={screen}
       defaultEmail={devAdmin.email}
       defaultPassword={devAdmin.password}
     />

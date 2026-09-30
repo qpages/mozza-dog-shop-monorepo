@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { LoginForm } from "@/components/admin/login-form";
+import { PhotoClaimsScreen } from "@/components/admin/photo-claims-screen";
 import { ShootingsScreen } from "@/components/admin/shootings-screen";
 import { SiteMenu } from "@/components/site-menu";
 import { Button } from "@/components/ui/button";
@@ -10,9 +11,14 @@ import { getSession, logout } from "@/lib/admin-client";
 type Props = {
   defaultEmail?: string;
   defaultPassword?: string;
+  screen?: "shootings" | "claims";
 };
 
-export function AdminApp({ defaultEmail = "", defaultPassword = "" }: Props) {
+export function AdminApp({
+  defaultEmail = "",
+  defaultPassword = "",
+  screen = "shootings",
+}: Props) {
   const [email, setEmail] = useState<string | null>();
 
   useEffect(() => {
@@ -88,7 +94,8 @@ export function AdminApp({ defaultEmail = "", defaultPassword = "" }: Props) {
         />
       ) : null}
 
-      {email ? <ShootingsScreen /> : null}
+      {email && screen === "shootings" ? <ShootingsScreen /> : null}
+      {email && screen === "claims" ? <PhotoClaimsScreen /> : null}
 
       <Toaster position="bottom-right" />
     </div>

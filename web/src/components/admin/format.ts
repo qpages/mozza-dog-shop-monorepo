@@ -64,3 +64,42 @@ export function shootingFacts(shooting: Shooting) {
   }
   return facts;
 }
+
+export type ClaimFactId = "date" | "received" | "dog" | "email";
+
+export function claimDisplayName(claim: {
+  firstName: string;
+  lastName: string;
+  email: string;
+}) {
+  return `${claim.firstName} ${claim.lastName}`.trim() || claim.email;
+}
+
+export function claimFacts(claim: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  dogName: string;
+  shootingDate: string;
+  createdAt: string;
+}) {
+  const facts: { id: ClaimFactId; label: string }[] = [
+    { id: "date", label: formatDate(claim.shootingDate) },
+    {
+      id: "received",
+      label: new Date(claim.createdAt).toLocaleDateString("fr-FR", {
+        dateStyle: "long",
+      }),
+    },
+  ];
+  if (claim.dogName.trim()) {
+    facts.push({ id: "dog", label: claim.dogName.trim() });
+  }
+  facts.push({ id: "email", label: claim.email });
+  return facts;
+}
+
+export function activeClaimLabel(count: number) {
+  if (count === 0) return "aucun signalement actif";
+  return count === 1 ? "1 signalement actif" : `${count} signalements actifs`;
+}

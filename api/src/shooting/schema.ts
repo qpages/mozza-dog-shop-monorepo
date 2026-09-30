@@ -138,3 +138,41 @@ export const photosRelations = relations(photos, ({ one }) => ({
     references: [shootingOwners.id],
   }),
 }));
+
+/** Visitor says they attended a shooting but their email has no photos. */
+export const PHOTO_CLAIM_STATUSES = ["open", "archived"] as const;
+export type PhotoClaimStatus = (typeof PHOTO_CLAIM_STATUSES)[number];
+
+export const photoClaims = pgTable(
+  "photo_claims",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(),
+    firstName: text("first_name").notNull(),
+    lastName: text("last_name").notNull(),
+    dogName: text("dog_name").notNull(),
+    shootingDate: date("shooting_date", { mode: "string" }).notNull(),
+    status: text("status", { enum: PHOTO_CLAIM_STATUSES })
+      .notNull()
+      .default("open"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("photo_claims_email_idx").on(table.email),
+    index("photo_claims_status_idx").on(table.status),
+    uniqueIndex("photo_claims_email_date_idx").on(
+      table.email,
+      table.shootingDate,
+    ),
+    check(
+      "photo_claims_email_lower",
+      sql`${table.email} = lower(${table.email})`,
+    ),
+    check("photo_claims_status", sql`${table.status} in ('open', 'archived')`),
+  ],
+);

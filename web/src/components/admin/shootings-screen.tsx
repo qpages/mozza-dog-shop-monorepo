@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { photoTotal } from "@/components/admin/format";
+import { PhotoClaimsSection } from "@/components/admin/photo-claims-section";
 import { ShootingDetail } from "@/components/admin/shooting-detail";
 import { ListSkeleton, ShootingList } from "@/components/admin/shooting-list";
 import { panelClass, quietCta } from "@/components/admin/styles";
@@ -169,16 +170,19 @@ export function ShootingsScreen() {
           </div>
         ) : null}
         {openId ? null : (
-          <ShootingList
-            shootings={shootings}
-            showArchived={showArchived}
-            onShowArchivedChange={setShowArchived}
-            onOpen={(id) => navigate(id)}
-            onCreated={async (id) => {
-              await reloadShootings();
-              navigate(id);
-            }}
-          />
+          <>
+            <ShootingList
+              shootings={shootings}
+              showArchived={showArchived}
+              onShowArchivedChange={setShowArchived}
+              onOpen={(id) => navigate(id)}
+              onCreated={async (id) => {
+                await reloadShootings();
+                navigate(id);
+              }}
+            />
+            <PhotoClaimsSection />
+          </>
         )}
       </main>
       <Dialog

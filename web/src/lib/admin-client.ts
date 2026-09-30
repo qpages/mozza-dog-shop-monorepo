@@ -107,6 +107,69 @@ export async function listShootings(): Promise<Shooting[] | null> {
   return body.shootings;
 }
 
+export type PhotoClaim = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  dogName: string;
+  shootingDate: string;
+  status: "open" | "archived";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PhotoClaimListQuery = {
+  status?: "open" | "archived" | "all";
+  limit?: number;
+};
+
+export async function listPhotoClaims(
+  query: PhotoClaimListQuery = {},
+): Promise<{ claims: PhotoClaim[]; total: number } | null> {
+  const params = new URLSearchParams();
+  if (query.status) params.set("status", query.status);
+  if (query.limit !== undefined) params.set("limit", String(query.limit));
+  const suffix = params.size > 0 ? `?${params}` : "";
+  const response = await request(`/admin/photo-claims${suffix}`);
+  if (!response?.ok) return null;
+  const body = (await response.json()) as {
+    claims: PhotoClaim[];
+    total?: number;
+  };
+  return {
+    claims: body.claims,
+    total: body.total ?? body.claims.length,
+  };
+}
+
+export async function setPhotoClaimArchived(
+  id: string,
+  archived: boolean,
+): Promise<boolean> {
+  const response = await request(
+    `/admin/photo-claims/${id}/${archived ? "archive" : "restore"}`,
+    { method: "POST" },
+  );
+  return response?.ok === true;
+}
+
+export async function deletePhotoClaim(id: string): Promise<boolean> {
+  const response = await request(`/admin/photo-claims/${id}`, {
+    method: "DELETE",
+  });
+  return response?.ok === true;
+}
+
+export async function deletePhotoClaims(ids: string[]): Promise<boolean> {
+  const response = await request("/admin/photo-claims", {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ids }),
+  });
+  return response?.ok === true;
+}
+
 export async function createShooting(input: {
   shotOn: string;
   name: string;

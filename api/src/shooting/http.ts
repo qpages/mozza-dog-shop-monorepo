@@ -1,5 +1,16 @@
 import { ZipArchive } from "archiver";
-import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  or,
+  sql,
+} from "drizzle-orm";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { randomUUID } from "node:crypto";
 import { withDetails } from "../logger.js";
@@ -21,7 +32,9 @@ import {
 import {
   MAX_PHOTO_BYTES,
   owners,
+  PHOTO_CLAIM_STATUSES,
   PHOTO_CONTENT_TYPES,
+  photoClaims,
   photos,
   shootingOwners,
   shootings,
@@ -181,9 +194,258 @@ export const shootingRoutes: FastifyPluginAsync = async (app) => {
         .send(archive);
     },
   );
+
+  app.post<{
+    Body: {
+      email: string;
+      firstName: string;
+      lastName: string;
+      dogName: string;
+      shootingDate: string;
+    };
+  }>(
+    "/photo-claims",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: [
+            "email",
+            "firstName",
+            "lastName",
+            "dogName",
+            "shootingDate",
+          ],
+          additionalProperties: false,
+          properties: {
+            email: { type: "string", format: "email", maxLength: 320 },
+            firstName: { type: "string", minLength: 1, maxLength: 80 },
+            lastName: { type: "string", minLength: 1, maxLength: 80 },
+            dogName: { type: "string", minLength: 1, maxLength: 80 },
+            shootingDate: {
+              type: "string",
+              pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!allowPhotoClaimIp(request.ip)) {
+        return reply.code(429).send({
+          statusCode: 429,
+          error: "Too Many Requests",
+          code: "rate_limited",
+          message: "Trop de tentatives. Réessaie plus tard.",
+        });
+      }
+
+      const email = normalizeEmail(request.body.email);
+      const firstName = trimClaimPersonField(request.body.firstName);
+      const lastName = trimClaimPersonField(request.body.lastName);
+      const dogName = trimClaimPersonField(request.body.dogName);
+      const shootingDate = parseClaimShootingDate(request.body.shootingDate);
+      if (!firstName || !lastName || !dogName) {
+        throw app.httpErrors.badRequest("invalid claim identity");
+      }
+      if (!shootingDate) {
+        throw app.httpErrors.badRequest("invalid shooting date");
+      }
+
+      const duplicate = await app.db.query.photoClaims.findFirst({
+        where: and(
+          eq(photoClaims.email, email),
+          eq(photoClaims.shootingDate, shootingDate),
+        ),
+      });
+      if (duplicate) {
+        return reply.code(409).send({
+          statusCode: 409,
+          error: "Conflict",
+          code: "already_reported",
+          message: "Ce shooting a déjà été signalé pour cet e-mail.",
+        });
+      }
+
+      const [openRow] = await app.db
+        .select({ value: count() })
+        .from(photoClaims)
+        .where(
+          and(eq(photoClaims.email, email), eq(photoClaims.status, "open")),
+        );
+      if ((openRow?.value ?? 0) >= MAX_OPEN_CLAIMS_PER_EMAIL) {
+        return reply.code(409).send({
+          statusCode: 409,
+          error: "Conflict",
+          code: "too_many_pending",
+          message:
+            "Vous avez déjà des signalements en attente. L’équipe s’en occupe.",
+        });
+      }
+
+      const since = new Date(Date.now() - CLAIM_CREATE_WINDOW_MS);
+      const [recentRow] = await app.db
+        .select({ value: count() })
+        .from(photoClaims)
+        .where(
+          and(eq(photoClaims.email, email), gte(photoClaims.createdAt, since)),
+        );
+      if ((recentRow?.value ?? 0) >= MAX_CLAIMS_PER_EMAIL_PER_DAY) {
+        return reply.code(429).send({
+          statusCode: 429,
+          error: "Too Many Requests",
+          code: "too_many_recent",
+          message: "Trop de signalements récemment. Réessayez plus tard.",
+        });
+      }
+
+      try {
+        const [created] = await app.db
+          .insert(photoClaims)
+          .values({ email, firstName, lastName, dogName, shootingDate })
+          .returning();
+        return { claim: serializePhotoClaim(created) };
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          return reply.code(409).send({
+            statusCode: 409,
+            error: "Conflict",
+            code: "already_reported",
+            message: "Ce shooting a déjà été signalé pour cet e-mail.",
+          });
+        }
+        throw error;
+      }
+    },
+  );
 };
 
 export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
+  app.get<{ Querystring: { status?: string; limit?: string } }>(
+    "/photo-claims",
+    {
+      schema: {
+        querystring: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            status: {
+              type: "string",
+              enum: ["all", ...PHOTO_CLAIM_STATUSES],
+            },
+            limit: { type: "string", pattern: "^([1-9]|[1-9][0-9]|100)$" },
+          },
+        },
+      },
+    },
+    async (request) => {
+      const status = request.query.status ?? "open";
+      const limit = request.query.limit
+        ? Number(request.query.limit)
+        : undefined;
+      const statusFilter =
+        status === "open" || status === "archived"
+          ? eq(photoClaims.status, status)
+          : undefined;
+      const [totalRow] = await app.db
+        .select({ value: count() })
+        .from(photoClaims)
+        .where(statusFilter);
+      const rows = await app.db.query.photoClaims.findMany({
+        where: statusFilter,
+        orderBy: [desc(photoClaims.createdAt)],
+        ...(limit !== undefined ? { limit } : {}),
+      });
+      return {
+        claims: rows.map(serializePhotoClaim),
+        total: totalRow?.value ?? 0,
+      };
+    },
+  );
+
+  app.post<{ Params: { claimId: string } }>(
+    "/photo-claims/:claimId/archive",
+    { schema: { params: uuidParams("claimId") } },
+    async (request) => {
+      const [claim] = await app.db
+        .update(photoClaims)
+        .set({ status: "archived", updatedAt: new Date() })
+        .where(
+          and(
+            eq(photoClaims.id, request.params.claimId),
+            eq(photoClaims.status, "open"),
+          ),
+        )
+        .returning();
+      if (!claim) throw app.httpErrors.notFound("photo claim not found");
+      return { claim: serializePhotoClaim(claim) };
+    },
+  );
+
+  app.post<{ Params: { claimId: string } }>(
+    "/photo-claims/:claimId/restore",
+    { schema: { params: uuidParams("claimId") } },
+    async (request) => {
+      const [claim] = await app.db
+        .update(photoClaims)
+        .set({ status: "open", updatedAt: new Date() })
+        .where(
+          and(
+            eq(photoClaims.id, request.params.claimId),
+            eq(photoClaims.status, "archived"),
+          ),
+        )
+        .returning();
+      if (!claim) throw app.httpErrors.notFound("photo claim not found");
+      return { claim: serializePhotoClaim(claim) };
+    },
+  );
+
+  app.delete<{ Body: { ids: string[] } }>(
+    "/photo-claims",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["ids"],
+          additionalProperties: false,
+          properties: {
+            ids: {
+              type: "array",
+              minItems: 1,
+              maxItems: 100,
+              items: { type: "string", format: "uuid" },
+            },
+          },
+        },
+      },
+    },
+    async (request) => {
+      const ids = [...new Set(request.body.ids)];
+      const deleted = await app.db
+        .delete(photoClaims)
+        .where(inArray(photoClaims.id, ids))
+        .returning({ id: photoClaims.id });
+      if (deleted.length === 0) {
+        throw app.httpErrors.notFound("photo claim not found");
+      }
+      return { deleted: deleted.length };
+    },
+  );
+
+  app.delete<{ Params: { claimId: string } }>(
+    "/photo-claims/:claimId",
+    { schema: { params: uuidParams("claimId") } },
+    async (request, reply) => {
+      const [claim] = await app.db
+        .delete(photoClaims)
+        .where(eq(photoClaims.id, request.params.claimId))
+        .returning({ id: photoClaims.id });
+      if (!claim) throw app.httpErrors.notFound("photo claim not found");
+      return reply.code(204).send();
+    },
+  );
+
   app.get("/shootings", async () => {
     const rows = await app.db.query.shootings.findMany({
       orderBy: [desc(shootings.shotOn)],
@@ -871,6 +1133,79 @@ function uuidParams(...names: string[]) {
       names.map((name) => [name, { type: "string", format: "uuid" }]),
     ),
   };
+}
+
+function serializePhotoClaim(claim: typeof photoClaims.$inferSelect) {
+  return {
+    id: claim.id,
+    email: claim.email,
+    firstName: claim.firstName,
+    lastName: claim.lastName,
+    dogName: claim.dogName,
+    shootingDate: claim.shootingDate,
+    status: claim.status,
+    createdAt: claim.createdAt.toISOString(),
+    updatedAt: claim.updatedAt.toISOString(),
+  };
+}
+
+function trimClaimPersonField(value: string) {
+  const trimmed = value.trim();
+  return trimmed.length > 0 && trimmed.length <= 80 ? trimmed : null;
+}
+
+const MAX_OPEN_CLAIMS_PER_EMAIL = 3;
+const MAX_CLAIMS_PER_EMAIL_PER_DAY = 5;
+const CLAIM_CREATE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const MAX_CLAIM_ATTEMPTS_PER_IP = 10;
+const CLAIM_IP_WINDOW_MS = 60 * 60 * 1000;
+
+const photoClaimAttemptsByIp = new Map<string, number[]>();
+
+function allowPhotoClaimIp(ip: string) {
+  const now = Date.now();
+  const recent = (photoClaimAttemptsByIp.get(ip) ?? []).filter(
+    (at) => now - at < CLAIM_IP_WINDOW_MS,
+  );
+  if (recent.length >= MAX_CLAIM_ATTEMPTS_PER_IP) {
+    photoClaimAttemptsByIp.set(ip, recent);
+    return false;
+  }
+  recent.push(now);
+  photoClaimAttemptsByIp.set(ip, recent);
+  return true;
+}
+
+/** YYYY-MM-DD calendar date, not future, not older than 2 years. */
+function parseClaimShootingDate(value: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(5, 7));
+  const day = Number(value.slice(8, 10));
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  if (
+    utc.getUTCFullYear() !== year ||
+    utc.getUTCMonth() !== month - 1 ||
+    utc.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  const now = new Date();
+  const todayUtc = new Date(
+    Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()),
+  );
+  if (utc > todayUtc) return null;
+  const minUtc = new Date(todayUtc);
+  minUtc.setUTCFullYear(minUtc.getUTCFullYear() - 2);
+  if (utc < minUtc) return null;
+  return value;
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  if ("code" in error && error.code === "23505") return true;
+  return "cause" in error && isUniqueViolation(error.cause);
 }
 
 function uniqueNames(names: string[]) {

@@ -34,6 +34,112 @@ export async function fetchOwnerGallery(
   }
 }
 
+export type PhotoClaim = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  dogName: string;
+  shootingDate: string;
+  status: "open" | "archived";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreatePhotoClaimResult =
+  | { ok: true; claim: PhotoClaim }
+  | {
+      ok: false;
+      reason:
+        | "already_reported"
+        | "too_many_pending"
+        | "too_many_recent"
+        | "rate_limited"
+        | "error";
+      message: string;
+    };
+
+const CLAIM_ERROR_MESSAGES = {
+  already_reported: "Ce shooting a déjà été signalé pour cet e-mail.",
+  too_many_pending:
+    "Vous avez déjà des signalements en attente. L’équipe s’en occupe.",
+  too_many_recent: "Trop de signalements récemment. Réessayez plus tard.",
+  rate_limited: "Trop de tentatives. Réessaie plus tard.",
+} as const;
+
+export async function createPhotoClaim(input: {
+  email: string;
+  firstName: string;
+  lastName: string;
+  dogName: string;
+  shootingDate: string;
+}): Promise<CreatePhotoClaimResult> {
+  try {
+    const response = await fetch(`${resolveApiUrl()}/photo-claims`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (response.ok) {
+      const body = (await response.json()) as { claim: PhotoClaim };
+      return { ok: true, claim: body.claim };
+    }
+
+    let code: string | undefined;
+    let message: string | undefined;
+    try {
+      const body = (await response.json()) as {
+        code?: string;
+        message?: string;
+      };
+      code = body.code;
+      message = body.message;
+    } catch {
+      // ignore
+    }
+
+    if (code === "already_reported") {
+      return {
+        ok: false,
+        reason: "already_reported",
+        message: CLAIM_ERROR_MESSAGES.already_reported,
+      };
+    }
+    if (code === "too_many_pending") {
+      return {
+        ok: false,
+        reason: "too_many_pending",
+        message: CLAIM_ERROR_MESSAGES.too_many_pending,
+      };
+    }
+    if (code === "too_many_recent") {
+      return {
+        ok: false,
+        reason: "too_many_recent",
+        message: CLAIM_ERROR_MESSAGES.too_many_recent,
+      };
+    }
+    if (code === "rate_limited" || response.status === 429) {
+      return {
+        ok: false,
+        reason: "rate_limited",
+        message: message?.trim() || CLAIM_ERROR_MESSAGES.rate_limited,
+      };
+    }
+    return {
+      ok: false,
+      reason: "error",
+      message: "Envoi impossible. Réessaie dans un instant.",
+    };
+  } catch {
+    return {
+      ok: false,
+      reason: "error",
+      message: "Envoi impossible. Réessaie dans un instant.",
+    };
+  }
+}
+
 export function downloadPhoto(photo: OwnerPhoto) {
   const link = document.createElement("a");
   link.href = photo.downloadUrl || photo.url;
