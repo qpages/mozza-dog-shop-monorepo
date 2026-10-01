@@ -11,10 +11,11 @@ import {
 } from "@/lib/photos-client";
 
 type Props = {
+  email: string;
   shooting: OwnerShooting;
 };
 
-export function OwnerGallery({ shooting }: Props) {
+export function OwnerGallery({ email, shooting }: Props) {
   const [viewingIndex, setViewingIndex] = useState<number | null>(null);
   const viewing =
     viewingIndex !== null ? (shooting.photos[viewingIndex] ?? null) : null;
@@ -81,7 +82,7 @@ export function OwnerGallery({ shooting }: Props) {
                 type="button"
                 size="sm"
                 className="min-h-11 touch-manipulation text-base sm:min-h-8 sm:text-sm"
-                onClick={() => downloadPhoto(viewing)}
+                onClick={() => downloadPhoto(email, viewing)}
               >
                 <Download />
                 Télécharger

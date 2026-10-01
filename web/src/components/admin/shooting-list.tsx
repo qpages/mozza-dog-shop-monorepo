@@ -1,5 +1,5 @@
 import { cn } from "cn";
-import { ChevronRight, Plus } from "lucide-react";
+import { Activity, ChevronRight, Plus } from "lucide-react";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { toast } from "sonner";
 import { today } from "@/components/admin/format";
@@ -19,6 +19,7 @@ type Props = {
   showArchived: boolean;
   onShowArchivedChange: (show: boolean) => void;
   onOpen: (id: string) => void;
+  onOpenActivity: () => void;
   onCreated: (id: string) => void;
 };
 
@@ -27,6 +28,7 @@ export function ShootingList({
   showArchived,
   onShowArchivedChange,
   onOpen,
+  onOpenActivity,
   onCreated,
 }: Props) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -52,17 +54,29 @@ export function ShootingList({
         >
           Shootings
         </h1>
-        {loading || showForm ? null : (
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <Button
             type="button"
+            variant="ghost"
             size="lg"
-            className={`w-full px-3 sm:w-auto ${touchControlLg}`}
-            onClick={() => setFormOpen(true)}
+            className={`text-paper hover:bg-paper/10 hover:text-paper w-full px-3 sm:w-auto ${touchControlLg}`}
+            onClick={onOpenActivity}
           >
-            <Plus />
-            Ajouter un shooting
+            <Activity />
+            Activité
           </Button>
-        )}
+          {loading || showForm ? null : (
+            <Button
+              type="button"
+              size="lg"
+              className={`w-full px-3 sm:w-auto ${touchControlLg}`}
+              onClick={() => setFormOpen(true)}
+            >
+              <Plus />
+              Ajouter un shooting
+            </Button>
+          )}
+        </div>
       </div>
 
       <section className="flex flex-col gap-4" aria-label="Shootings en cours">

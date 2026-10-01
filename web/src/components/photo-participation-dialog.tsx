@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { recordOwnerEvent } from "@/lib/photos-client";
 import {
   Dialog,
   DialogContent,
@@ -11,11 +12,12 @@ import {
 const INSTAGRAM_MESSAGE_URL = "https://ig.me/m/mozza.dog.shop";
 
 type Props = {
+  email: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
-export function PhotoParticipationDialog({ open, onOpenChange }: Props) {
+export function PhotoParticipationDialog({ email, open, onOpenChange }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -29,6 +31,9 @@ export function PhotoParticipationDialog({ open, onOpenChange }: Props) {
         <DialogFooter>
           <Button
             nativeButton={false}
+            onClick={() => {
+              void recordOwnerEvent({ type: "instagram_message", email });
+            }}
             render={
               <a
                 href={INSTAGRAM_MESSAGE_URL}

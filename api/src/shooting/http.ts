@@ -1,3 +1,4 @@
+import { normalizeIP } from "@fastify/rate-limit";
 import { ZipArchive } from "archiver";
 import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
@@ -6,6 +7,11 @@ import { withDetails } from "../logger.js";
 import { contentDispositionAttachment } from "../storage.js";
 import { requireStorage } from "../types.js";
 import { normalizeEmail } from "./email.js";
+import {
+  parsePublicOwnerEvent,
+  recordOwnerEvent,
+  recordOwnerEventQuiet,
+} from "./owner-events.js";
 import { changeOwnerEmail } from "./owner-email.js";
 import { drizzleOwnerEmailPort } from "./owner-email-store.js";
 import {
@@ -20,6 +26,7 @@ import {
 } from "./thumbnail.js";
 import {
   MAX_PHOTO_BYTES,
+  ownerEvents,
   owners,
   PHOTO_CONTENT_TYPES,
   photos,
@@ -102,6 +109,137 @@ export const shootingRoutes: FastifyPluginAsync = async (app) => {
     },
   );
 
+  app.post<{
+    Body: {
+      email: string;
+      type: "shooting_opened" | "participation_claimed" | "instagram_message";
+      shootingId?: string;
+    };
+  }>(
+    "/owner-events",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["email", "type"],
+          additionalProperties: false,
+          properties: {
+            email: { type: "string", format: "email", maxLength: 320 },
+            type: {
+              type: "string",
+              enum: [
+                "shooting_opened",
+                "participation_claimed",
+                "instagram_message",
+              ],
+            },
+            shootingId: { type: "string", format: "uuid" },
+          },
+        },
+      },
+      config: {
+        rateLimit: {
+          hook: "preHandler",
+          timeWindow: "1 minute",
+          max: (request) =>
+            ownerEventBucket(request.body) === "participation_claimed" ? 3 : 30,
+          keyGenerator: (request) =>
+            `${normalizeIP(request.ip)}:${ownerEventBucket(request.body)}`,
+        },
+      },
+    },
+    async (request, reply) => {
+      const parsed = parsePublicOwnerEvent(request.body);
+      if (!parsed.ok) {
+        if (parsed.error === "invalid-email") {
+          throw app.httpErrors.badRequest("invalid email");
+        }
+        if (parsed.error === "shooting-required") {
+          throw app.httpErrors.badRequest("shooting is required");
+        }
+        throw app.httpErrors.badRequest("invalid event type");
+      }
+
+      if (parsed.event.type === "shooting_opened" && parsed.event.shootingId) {
+        const shooting = await app.db.query.shootings.findFirst({
+          where: eq(shootings.id, parsed.event.shootingId),
+          columns: { id: true },
+        });
+        if (!shooting) throw app.httpErrors.notFound("shooting not found");
+      }
+
+      await recordOwnerEvent(app.db, parsed.event);
+      return reply.code(204).send();
+    },
+  );
+
+  app.get<{ Params: { photoId: string }; Querystring: { email: string } }>(
+    "/photos/:photoId/download",
+    {
+      schema: {
+        params: uuidParams("photoId"),
+        querystring: {
+          type: "object",
+          required: ["email"],
+          additionalProperties: false,
+          properties: {
+            email: { type: "string", format: "email", maxLength: 320 },
+          },
+        },
+      },
+      config: {
+        rateLimit: {
+          max: 30,
+          timeWindow: "1 minute",
+        },
+      },
+    },
+    async (request, reply) => {
+      const email = normalizeEmail(request.query.email);
+      const photo = await app.db.query.photos.findFirst({
+        where: eq(photos.id, request.params.photoId),
+        with: {
+          shootingOwner: {
+            with: {
+              owner: true,
+              shooting: true,
+              photos: { orderBy: [desc(photos.createdAt)] },
+            },
+          },
+        },
+      });
+      const sheet = photo?.shootingOwner;
+      if (
+        !photo ||
+        !sheet ||
+        sheet.owner.email !== email ||
+        sheet.shooting.archivedAt
+      ) {
+        throw app.httpErrors.notFound("photo not found");
+      }
+
+      const storage = requireStorage(app);
+      const index = sheet.photos.findIndex((row) => row.id === photo.id);
+      const url = await storage.presignGet(photo.objectKey, {
+        downloadName: photoDownloadFilename({
+          shootingName: sheet.shooting.name,
+          dogNames: sheet.owner.dogNames,
+          index: index === -1 ? 0 : index,
+          contentType: photo.contentType,
+        }),
+      });
+
+      await recordOwnerEventQuiet(app.db, request.log, {
+        email,
+        type: "photo_downloaded",
+        shootingId: sheet.shootingId,
+        photoId: photo.id,
+      });
+
+      return reply.redirect(url);
+    },
+  );
+
   app.get<{ Querystring: { email: string; shooting: string } }>(
     "/photos/archive",
     {
@@ -142,6 +280,13 @@ export const shootingRoutes: FastifyPluginAsync = async (app) => {
       if (!sheet || sheet.shooting.archivedAt || sheet.photos.length === 0) {
         throw app.httpErrors.notFound("photos not found");
       }
+
+      await recordOwnerEventQuiet(app.db, request.log, {
+        email,
+        type: "zip_downloaded",
+        shootingId: sheet.shootingId,
+        photoId: null,
+      });
 
       const storage = requireStorage(app);
       const zipName = shootingArchiveFilename(sheet.shooting.name);
@@ -184,6 +329,30 @@ export const shootingRoutes: FastifyPluginAsync = async (app) => {
 };
 
 export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
+  app.get("/owner-events", async () => {
+    const rows = await app.db
+      .select({
+        id: ownerEvents.id,
+        email: ownerEvents.email,
+        type: ownerEvents.type,
+        shootingId: ownerEvents.shootingId,
+        shootingName: shootings.name,
+        photoId: ownerEvents.photoId,
+        createdAt: ownerEvents.createdAt,
+      })
+      .from(ownerEvents)
+      .leftJoin(shootings, eq(ownerEvents.shootingId, shootings.id))
+      .orderBy(desc(ownerEvents.createdAt))
+      .limit(200);
+
+    return {
+      events: rows.map((row) => ({
+        ...row,
+        createdAt: row.createdAt.toISOString(),
+      })),
+    };
+  });
+
   app.get("/shootings", async () => {
     const rows = await app.db.query.shootings.findMany({
       orderBy: [desc(shootings.shotOn)],
@@ -858,6 +1027,16 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
     },
   );
 };
+
+function ownerEventBucket(body: unknown) {
+  const type =
+    typeof body === "object" && body !== null && "type" in body
+      ? body.type
+      : undefined;
+  return type === "participation_claimed"
+    ? "participation_claimed"
+    : "owner_event";
+}
 
 function likeContains(value: string) {
   return `%${value.replace(/[%_\\]/g, "\\$&")}%`;

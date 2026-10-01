@@ -25,6 +25,7 @@ import {
   archiveFilenameFromShootingName,
   canAttemptArchiveShare,
   fetchOwnerGallery,
+  recordOwnerEvent,
   shareArchiveIfPossible,
   shootingArchiveUrl,
   triggerArchiveDownload,
@@ -317,6 +318,15 @@ function GalleryScreen({
     heading.current?.focus();
   }, [opened?.id, showList]);
 
+  useEffect(() => {
+    if (!opened) return;
+    void recordOwnerEvent({
+      type: "shooting_opened",
+      email,
+      shootingId: opened.id,
+    });
+  }, [email, opened?.id]);
+
   return (
     <main
       className={cn(
@@ -393,7 +403,7 @@ function GalleryScreen({
             </div>
           </div>
           <section className={cn(panelClass, "p-5")}>
-            <OwnerGallery shooting={opened} />
+            <OwnerGallery email={email} shooting={opened} />
           </section>
         </>
       ) : null}
@@ -482,12 +492,22 @@ function EmptyEmailState({ email }: { email: string }) {
         <Button
           type="button"
           className="mt-4 min-h-11 w-full touch-manipulation px-3.5 text-base sm:min-h-8 sm:w-fit sm:text-sm"
-          onClick={() => setClaimOpen(true)}
+          onClick={() => {
+            void recordOwnerEvent({
+              type: "participation_claimed",
+              email,
+            });
+            setClaimOpen(true);
+          }}
         >
           J’ai participé à un shooting
         </Button>
       </div>
-      <PhotoParticipationDialog open={claimOpen} onOpenChange={setClaimOpen} />
+      <PhotoParticipationDialog
+        email={email}
+        open={claimOpen}
+        onOpenChange={setClaimOpen}
+      />
     </>
   );
 }

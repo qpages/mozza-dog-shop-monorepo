@@ -100,6 +100,30 @@ export async function logout(): Promise<boolean> {
   return response?.ok === true;
 }
 
+export type OwnerEventType =
+  | "shooting_opened"
+  | "zip_downloaded"
+  | "photo_downloaded"
+  | "participation_claimed"
+  | "instagram_message";
+
+export type OwnerEvent = {
+  id: string;
+  email: string;
+  type: OwnerEventType;
+  shootingId: string | null;
+  shootingName: string | null;
+  photoId: string | null;
+  createdAt: string;
+};
+
+export async function listOwnerEvents(): Promise<OwnerEvent[] | null> {
+  const response = await request("/admin/owner-events");
+  if (!response?.ok) return null;
+  const body = (await response.json()) as { events: OwnerEvent[] };
+  return body.events;
+}
+
 export async function listShootings(): Promise<Shooting[] | null> {
   const response = await request("/admin/shootings");
   if (!response?.ok) return null;

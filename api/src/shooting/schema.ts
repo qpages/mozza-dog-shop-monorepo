@@ -109,6 +109,52 @@ export const photos = pgTable(
   ],
 );
 
+export const OWNER_EVENT_TYPES = [
+  "shooting_opened",
+  "zip_downloaded",
+  "photo_downloaded",
+  "participation_claimed",
+  "instagram_message",
+] as const;
+
+export const ownerEvents = pgTable(
+  "owner_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(),
+    type: text("type").notNull(),
+    shootingId: uuid("shooting_id").references(() => shootings.id, {
+      onDelete: "set null",
+    }),
+    photoId: uuid("photo_id").references(() => photos.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("owner_events_email_idx").on(table.email),
+    index("owner_events_type_idx").on(table.type),
+    index("owner_events_created_at_idx").on(table.createdAt.desc()),
+    index("owner_events_shooting_id_idx").on(table.shootingId),
+    // First gallery open only — refreshes must not flood Activité.
+    uniqueIndex("owner_events_open_once_idx")
+      .on(table.email, table.shootingId)
+      .where(
+        sql`${table.type} = 'shooting_opened' AND ${table.shootingId} IS NOT NULL`,
+      ),
+    check(
+      "owner_events_email_lower",
+      sql`${table.email} = lower(${table.email})`,
+    ),
+    check(
+      "owner_events_type",
+      sql`${table.type} in ('shooting_opened','zip_downloaded','photo_downloaded','participation_claimed','instagram_message')`,
+    ),
+  ],
+);
+
 export const shootingsRelations = relations(shootings, ({ many }) => ({
   shootingOwners: many(shootingOwners),
 }));
@@ -136,5 +182,16 @@ export const photosRelations = relations(photos, ({ one }) => ({
   shootingOwner: one(shootingOwners, {
     fields: [photos.shootingOwnerId],
     references: [shootingOwners.id],
+  }),
+}));
+
+export const ownerEventsRelations = relations(ownerEvents, ({ one }) => ({
+  shooting: one(shootings, {
+    fields: [ownerEvents.shootingId],
+    references: [shootings.id],
+  }),
+  photo: one(photos, {
+    fields: [ownerEvents.photoId],
+    references: [photos.id],
   }),
 }));

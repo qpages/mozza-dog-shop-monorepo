@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ActivityScreen } from "@/components/admin/activity-screen";
 import { photoTotal } from "@/components/admin/format";
 import { ShootingDetail } from "@/components/admin/shooting-detail";
 import { ListSkeleton, ShootingList } from "@/components/admin/shooting-list";
@@ -20,9 +21,17 @@ import {
   type Shooting,
 } from "@/lib/admin-client";
 
-function readShootingId() {
-  if (typeof window === "undefined") return null;
-  return new URLSearchParams(window.location.search).get("shooting");
+function readAdminView() {
+  if (typeof window === "undefined") {
+    return { page: "list" as const, shootingId: null };
+  }
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("view") === "activite") {
+    return { page: "activity" as const, shootingId: null };
+  }
+  const shootingId = params.get("shooting");
+  if (shootingId) return { page: "detail" as const, shootingId };
+  return { page: "list" as const, shootingId: null };
 }
 
 function deleteMessage(shooting: Shooting) {
@@ -33,8 +42,12 @@ function deleteMessage(shooting: Shooting) {
 }
 
 export function ShootingsScreen() {
+  const initial = readAdminView();
   const [shootings, setShootings] = useState<Shooting[] | null>(null);
-  const [openId, setOpenId] = useState<string | null>(readShootingId);
+  const [page, setPage] = useState<"list" | "detail" | "activity">(
+    initial.page,
+  );
+  const [openId, setOpenId] = useState<string | null>(initial.shootingId);
   const [showArchived, setShowArchived] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Shooting | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -64,22 +77,36 @@ export function ShootingsScreen() {
   }, []);
 
   useEffect(() => {
-    const onPopState = () => setOpenId(readShootingId());
+    const onPopState = () => {
+      const next = readAdminView();
+      setPage(next.page);
+      setOpenId(next.shootingId);
+    };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
   useEffect(() => {
-    if (shootings && openId && !opened) navigate(null, true);
-  }, [shootings, openId, opened]);
+    if (page === "detail" && shootings && openId && !opened) {
+      navigate({ page: "list" }, true);
+    }
+  }, [page, shootings, openId, opened]);
 
-  function navigate(id: string | null, replace = false) {
+  function navigate(
+    next: { page: "list" | "detail" | "activity"; shootingId?: string | null },
+    replace = false,
+  ) {
     const url = new URL(window.location.href);
-    if (id) url.searchParams.set("shooting", id);
-    else url.searchParams.delete("shooting");
+    url.searchParams.delete("shooting");
+    url.searchParams.delete("view");
+    if (next.page === "activity") url.searchParams.set("view", "activite");
+    if (next.page === "detail" && next.shootingId) {
+      url.searchParams.set("shooting", next.shootingId);
+    }
     if (replace) window.history.replaceState({}, "", url);
     else window.history.pushState({}, "", url);
-    setOpenId(id);
+    setPage(next.page);
+    setOpenId(next.page === "detail" ? (next.shootingId ?? null) : null);
     window.scrollTo({ top: 0 });
   }
 
@@ -117,7 +144,7 @@ export function ShootingsScreen() {
             onClick: () => void setArchived(shooting, false),
           },
         });
-        navigate(null);
+        navigate({ page: "list" });
       } else {
         toast.success(`« ${shooting.name} » remis en ligne.`);
       }
@@ -139,7 +166,7 @@ export function ShootingsScreen() {
         return;
       }
       toast.success("Shooting supprimé.");
-      if (openId === pendingDelete.id) navigate(null, true);
+      if (openId === pendingDelete.id) navigate({ page: "list" }, true);
       setPendingDelete(null);
       await reloadShootings();
     } catch {
@@ -152,34 +179,42 @@ export function ShootingsScreen() {
   return (
     <>
       <main className="admin-rise mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-5 pb-[max(4rem,env(safe-area-inset-bottom))] pt-4 sm:px-6">
-        {opened ? (
+        {page === "activity" ? (
+          <ActivityScreen
+            shootings={shootings}
+            onBack={() => navigate({ page: "list" })}
+            onAttached={() => void reloadShootings()}
+          />
+        ) : null}
+        {page === "detail" && opened ? (
           <ShootingDetail
             key={opened.id}
             shooting={opened}
             archiving={archivingId === opened.id}
-            onBack={() => navigate(null)}
+            onBack={() => navigate({ page: "list" })}
             onArchive={(archived) => void setArchived(opened, archived)}
             onDelete={() => setPendingDelete(opened)}
             onChanged={() => void reloadShootings()}
           />
         ) : null}
-        {openId && shootings === null ? (
+        {page === "detail" && openId && shootings === null ? (
           <div className={panelClass}>
             <ListSkeleton />
           </div>
         ) : null}
-        {openId ? null : (
+        {page === "list" ? (
           <ShootingList
             shootings={shootings}
             showArchived={showArchived}
             onShowArchivedChange={setShowArchived}
-            onOpen={(id) => navigate(id)}
+            onOpen={(id) => navigate({ page: "detail", shootingId: id })}
+            onOpenActivity={() => navigate({ page: "activity" })}
             onCreated={async (id) => {
               await reloadShootings();
-              navigate(id);
+              navigate({ page: "detail", shootingId: id });
             }}
           />
-        )}
+        ) : null}
       </main>
       <Dialog
         open={pendingDelete !== null}

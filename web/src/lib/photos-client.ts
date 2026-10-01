@@ -34,14 +34,34 @@ export async function fetchOwnerGallery(
   }
 }
 
-export function downloadPhoto(photo: OwnerPhoto) {
+export function photoDownloadUrl(email: string, photoId: string) {
+  return `${resolveApiUrl()}/photos/${encodeURIComponent(photoId)}/download?email=${encodeURIComponent(email)}`;
+}
+
+export function downloadPhoto(email: string, photo: OwnerPhoto) {
   const link = document.createElement("a");
-  link.href = photo.downloadUrl || photo.url;
+  link.href = photoDownloadUrl(email, photo.id);
   link.download = "";
   link.rel = "noopener";
   document.body.append(link);
   link.click();
   link.remove();
+}
+
+export async function recordOwnerEvent(input: {
+  email: string;
+  type: "shooting_opened" | "participation_claimed" | "instagram_message";
+  shootingId?: string;
+}): Promise<void> {
+  try {
+    await fetch(`${resolveApiUrl()}/owner-events`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+  } catch {
+    // Gallery must stay usable if telemetry fails.
+  }
 }
 
 export function shootingArchiveUrl(email: string, shootingId: string) {
