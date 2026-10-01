@@ -35,7 +35,7 @@
   object-position: center 30%;
 }
 
-.photo-print:last-child img {
+.photo-print:nth-child(2) img {
   object-position: 24% center;
 }
 

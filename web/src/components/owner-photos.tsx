@@ -226,6 +226,8 @@ export function OwnerPhotos() {
 }
 
 function EmailGate({ onSubmit }: { onSubmit: (email: string) => void }) {
+  const [participationOpen, setParticipationOpen] = useState(false);
+
   return (
     <div className="admin-rise flex flex-1 flex-col items-center justify-start gap-8 pb-[max(2rem,env(safe-area-inset-bottom))] pt-2 sm:justify-center sm:gap-10 sm:py-8 sm:pb-8">
       <main className="mx-auto flex w-full max-w-md shrink-0 flex-col gap-5 px-6">
@@ -234,7 +236,7 @@ function EmailGate({ onSubmit }: { onSubmit: (email: string) => void }) {
             Vos photos
           </h1>
           <p className="type-body text-paper/95">
-            Récupérez les clichés de votre shooting avec votre chien.
+            Récupérez les clichés numériques d'un shooting chez Mozza Dog Shop.
           </p>
         </div>
         <div className="bg-paper shadow-paper rounded-2xl p-5">
@@ -249,7 +251,7 @@ function EmailGate({ onSubmit }: { onSubmit: (email: string) => void }) {
             }}
           >
             <label htmlFor="email" className="text-base font-medium sm:text-sm">
-              E-mail du shooting
+              E-mail renseigné lors du shooting
             </label>
             <input
               id="email"
@@ -283,8 +285,20 @@ function EmailGate({ onSubmit }: { onSubmit: (email: string) => void }) {
           <ShoppingCart className="size-4 shrink-0" aria-hidden="true" />
           Accéder à la boutique
         </a>
+        <button
+          type="button"
+          className="text-paper/85 hover:text-paper focus-visible:text-paper focus-visible:ring-paper/40 mx-auto -mt-2 min-h-11 w-fit touch-manipulation px-2 text-xs underline-offset-2 transition-colors duration-200 hover:underline focus-visible:underline focus-visible:outline-none focus-visible:ring-2"
+          onClick={() => setParticipationOpen(true)}
+        >
+          J’ai oublié l’e-mail renseigné
+        </button>
       </main>
       <PhotoPrints />
+      <PhotoParticipationDialog
+        email=""
+        open={participationOpen}
+        onOpenChange={setParticipationOpen}
+      />
     </div>
   );
 }

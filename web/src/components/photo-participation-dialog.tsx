@@ -32,6 +32,7 @@ export function PhotoParticipationDialog({ email, open, onOpenChange }: Props) {
           <Button
             nativeButton={false}
             onClick={() => {
+              if (!email) return;
               void recordOwnerEvent({ type: "instagram_message", email });
             }}
             render={
