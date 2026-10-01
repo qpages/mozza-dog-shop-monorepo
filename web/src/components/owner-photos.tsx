@@ -19,6 +19,7 @@ import {
   subtleText,
 } from "@/components/admin/styles";
 import { SiteMenu } from "@/components/site-menu";
+import { PhotoParticipationDialog } from "@/components/photo-participation-dialog";
 import { Button } from "@/components/ui/button";
 import {
   archiveFilenameFromShootingName,
@@ -397,11 +398,7 @@ function GalleryScreen({
         </>
       ) : null}
 
-      {status !== "error" && shootingId && !opened ? (
-        <div className={panelClass}>
-          <ListSkeleton />
-        </div>
-      ) : null}
+      {status !== "error" && shootingId && !opened ? <ListSkeleton /> : null}
 
       {status !== "error" && showList ? (
         <>
@@ -417,28 +414,19 @@ function GalleryScreen({
               Vos shootings
             </h1>
           </div>
-          <section className={panelClass} aria-label="Vos shootings">
+          <section className="flex flex-col gap-4" aria-label="Vos shootings">
             {status === "loading" || shootings === null ? (
               <ListSkeleton />
             ) : null}
 
             {status === "idle" && shootings && shootings.length === 0 ? (
-              <div className="px-5 py-6">
-                <p className="text-base font-medium">
-                  Aucune photo pour cet e-mail
-                </p>
-                <p className={cn("mt-1 text-sm leading-normal", subtleText)}>
-                  Aucun shooting n’est lié à{" "}
-                  <span className="text-foreground font-medium">{email}</span>{" "}
-                  pour l’instant.
-                </p>
-              </div>
+              <EmptyEmailState email={email} />
             ) : null}
 
             {status === "idle" && shootings && shootings.length > 0 ? (
-              <ul className="divide-ink/10 divide-y">
+              <ul className="flex flex-col gap-4">
                 {shootings.map((shooting) => (
-                  <li key={shooting.id}>
+                  <li key={shooting.id} className={panelClass}>
                     <a
                       href={`?email=${encodeURIComponent(email)}&shooting=${shooting.id}`}
                       onClick={(event) => {
@@ -448,7 +436,7 @@ function GalleryScreen({
                         onOpen(shooting.id);
                       }}
                       className={cn(
-                        "group flex min-h-11 touch-manipulation items-center gap-4 px-5 py-3.5",
+                        "group flex min-h-11 touch-manipulation items-center gap-4 px-5 py-3.5 sm:min-h-0 sm:py-4",
                         rowHover,
                       )}
                     >
@@ -476,6 +464,31 @@ function GalleryScreen({
         </>
       ) : null}
     </main>
+  );
+}
+
+function EmptyEmailState({ email }: { email: string }) {
+  const [claimOpen, setClaimOpen] = useState(false);
+
+  return (
+    <>
+      <div className={cn(panelClass, "px-5 py-6")}>
+        <p className="text-base font-medium">Aucune photo pour cet e-mail</p>
+        <p className={cn("mt-1 text-sm leading-normal", subtleText)}>
+          Aucun shooting n’est lié à{" "}
+          <span className="text-foreground font-medium">{email}</span> pour
+          l’instant.
+        </p>
+        <Button
+          type="button"
+          className="mt-4 min-h-11 w-full touch-manipulation px-3.5 text-base sm:min-h-8 sm:w-fit sm:text-sm"
+          onClick={() => setClaimOpen(true)}
+        >
+          J’ai participé à un shooting
+        </Button>
+      </div>
+      <PhotoParticipationDialog open={claimOpen} onOpenChange={setClaimOpen} />
+    </>
   );
 }
 
@@ -638,9 +651,9 @@ function ListSkeleton() {
       <p className="sr-only" role="status">
         Chargement…
       </p>
-      <ul aria-hidden="true" className="divide-ink/10 divide-y">
+      <ul aria-hidden="true" className="flex flex-col gap-4">
         {[0, 1, 2].map((row) => (
-          <li key={row} className="px-5 py-4">
+          <li key={row} className={cn(panelClass, "px-5 py-4")}>
             <div className="bg-ink/10 h-4 w-40 animate-pulse rounded motion-reduce:animate-none" />
             <div className="mt-2 flex gap-3">
               <div className="bg-ink/7 h-3.5 w-28 animate-pulse rounded motion-reduce:animate-none" />
