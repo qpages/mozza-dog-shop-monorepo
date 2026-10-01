@@ -42,6 +42,16 @@ export function formatDateTime(iso: string) {
   });
 }
 
+export function formatActivityDate(iso: string) {
+  return new Date(iso).toLocaleString("fr-FR", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function participantLabel(count: number) {
   if (count === 0) return "aucun participant";
   return count === 1 ? "1 participant" : `${count} participants`;

@@ -124,6 +124,13 @@ export async function listOwnerEvents(): Promise<OwnerEvent[] | null> {
   return body.events;
 }
 
+export async function deleteOwnerEvent(id: string): Promise<boolean> {
+  const response = await request(`/admin/owner-events/${id}`, {
+    method: "DELETE",
+  });
+  return response?.ok === true;
+}
+
 export async function listShootings(): Promise<Shooting[] | null> {
   const response = await request("/admin/shootings");
   if (!response?.ok) return null;

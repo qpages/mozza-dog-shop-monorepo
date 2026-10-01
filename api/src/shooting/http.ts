@@ -358,6 +358,21 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
     };
   });
 
+  app.delete<{ Params: { eventId: string } }>(
+    "/owner-events/:eventId",
+    { schema: { params: uuidParams("eventId") } },
+    async (request, reply) => {
+      const deleted = await app.db
+        .delete(ownerEvents)
+        .where(eq(ownerEvents.id, request.params.eventId))
+        .returning({ id: ownerEvents.id });
+      if (deleted.length === 0) {
+        throw app.httpErrors.notFound("event not found");
+      }
+      return reply.code(204).send();
+    },
+  );
+
   app.get("/shootings", async () => {
     const rows = await app.db.query.shootings.findMany({
       orderBy: [desc(shootings.shotOn)],

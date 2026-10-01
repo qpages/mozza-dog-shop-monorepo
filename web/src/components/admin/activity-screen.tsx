@@ -1,8 +1,16 @@
 import { cn } from "cn";
-import { Calendar, ChevronLeft, Plus } from "lucide-react";
+import { Calendar, ChevronLeft, Mail, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { formatDateTime } from "@/components/admin/format";
+import {
+  ActivityFiltersBar,
+  emptyActivityFilters,
+  eventLabels,
+  filterOwnerEvents,
+  hasActivityFilters,
+  type ActivityFilters,
+} from "@/components/admin/activity-filters";
+import { formatActivityDate } from "@/components/admin/format";
 import { ListSkeleton } from "@/components/admin/shooting-list";
 import {
   fieldClass,
@@ -22,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   addShootingOwner,
+  deleteOwnerEvent,
   listOwnerEvents,
   type OwnerEvent,
   type OwnerEventType,
@@ -34,18 +43,13 @@ type Props = {
   onAttached: () => void;
 };
 
-const eventLabels: Record<OwnerEventType, string> = {
-  shooting_opened: "Galerie consultée",
-  zip_downloaded: "Archive ZIP téléchargée",
-  photo_downloaded: "Photo téléchargée",
-  participation_claimed: "Demande de rattachement",
-  instagram_message: "Message Instagram",
-};
-
 export function ActivityScreen({ shootings, onBack, onAttached }: Props) {
   const heading = useRef<HTMLHeadingElement>(null);
   const [events, setEvents] = useState<OwnerEvent[] | null>(null);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<OwnerEvent | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [filters, setFilters] = useState<ActivityFilters>(emptyActivityFilters);
 
   useEffect(() => {
     heading.current?.focus();
@@ -70,6 +74,28 @@ export function ActivityScreen({ shootings, onBack, onAttached }: Props) {
       cancelled = true;
     };
   }, []);
+
+  async function confirmDelete() {
+    if (!pendingDelete || deleting) return;
+    setDeleting(true);
+    try {
+      const ok = await deleteOwnerEvent(pendingDelete.id);
+      if (!ok) {
+        toast.error("Impossible de supprimer l'activité.");
+        return;
+      }
+      setEvents(
+        (current) =>
+          current?.filter((event) => event.id !== pendingDelete.id) ?? current,
+      );
+      toast.success("Activité supprimée.");
+      setPendingDelete(null);
+    } catch {
+      toast.error("Impossible de supprimer l'activité.");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <>
@@ -114,19 +140,13 @@ export function ActivityScreen({ shootings, onBack, onAttached }: Props) {
         ) : null}
 
         {events && events.length > 0 ? (
-          <ul className="flex flex-col gap-4">
-            {events.map((event) => (
-              <ActivityRow
-                key={event.id}
-                event={event}
-                onAttach={
-                  isContactRequest(event.type) && !event.shootingId
-                    ? () => setPendingEmail(event.email)
-                    : undefined
-                }
-              />
-            ))}
-          </ul>
+          <ActivityList
+            events={events}
+            filters={filters}
+            onFiltersChange={setFilters}
+            onAttach={setPendingEmail}
+            onDelete={setPendingDelete}
+          />
         ) : null}
       </section>
 
@@ -136,6 +156,95 @@ export function ActivityScreen({ shootings, onBack, onAttached }: Props) {
         onClose={() => setPendingEmail(null)}
         onAttached={onAttached}
       />
+      <Dialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setPendingDelete(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Supprimer cette activité ?</DialogTitle>
+            <DialogDescription>
+              {pendingDelete
+                ? `${eventLabels[pendingDelete.type]} de ${pendingDelete.email}. Cette ligne disparaît de l'historique.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className={quietCta}
+              disabled={deleting}
+              onClick={() => setPendingDelete(null)}
+            >
+              Annuler
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleting}
+              onClick={() => void confirmDelete()}
+            >
+              {deleting ? "Suppression…" : "Supprimer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function ActivityList({
+  events,
+  filters,
+  onFiltersChange,
+  onAttach,
+  onDelete,
+}: {
+  events: OwnerEvent[];
+  filters: ActivityFilters;
+  onFiltersChange: (filters: ActivityFilters) => void;
+  onAttach: (email: string) => void;
+  onDelete: (event: OwnerEvent) => void;
+}) {
+  const visible = filterOwnerEvents(events, filters);
+  const filtering = hasActivityFilters(filters);
+
+  return (
+    <>
+      <ActivityFiltersBar filters={filters} onChange={onFiltersChange} />
+      {visible.length === 0 ? (
+        <div className={panelClass}>
+          <div className="px-5 pb-5 pt-5">
+            <p className="font-medium">Aucun résultat</p>
+            <p className={cn("mt-1 text-sm", subtleText)}>
+              Aucune activité ne correspond à ces filtres.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-4">
+          {visible.map((event) => (
+            <ActivityRow
+              key={event.id}
+              event={event}
+              onAttach={
+                isContactRequest(event.type) && !event.shootingId
+                  ? () => onAttach(event.email)
+                  : undefined
+              }
+              onDelete={() => onDelete(event)}
+            />
+          ))}
+        </ul>
+      )}
+      {filtering ? (
+        <p className="type-caption text-paper/80">
+          {visible.length === 1 ? "1 activité" : `${visible.length} activités`}
+        </p>
+      ) : null}
     </>
   );
 }
@@ -143,54 +252,71 @@ export function ActivityScreen({ shootings, onBack, onAttached }: Props) {
 function ActivityRow({
   event,
   onAttach,
+  onDelete,
 }: {
   event: OwnerEvent;
   onAttach?: () => void;
+  onDelete: () => void;
 }) {
   const shooting = eventShooting(event);
 
   return (
     <li className={panelClass}>
-      <div className="grid gap-x-4 gap-y-2 px-5 py-3.5 text-sm leading-5 sm:grid-cols-[minmax(8rem,9rem)_minmax(12rem,1fr)_auto_9.5rem] sm:items-center sm:py-4">
-        <p className="truncate font-medium">{event.email}</p>
-        <p className="min-w-0">
-          <span className="text-ink font-medium">
-            {eventLabels[event.type]}
-          </span>
-          {shooting ? (
-            <>
-              <span className="text-ink/60 hidden sm:inline"> sur </span>
-              <span className="text-ink/60 mt-0.5 block truncate sm:mt-0 sm:inline">
-                <span className="sm:hidden">Shooting : </span>
-                {shooting}
-              </span>
-            </>
-          ) : null}
-        </p>
-        <p
+      <div className="flex flex-col gap-2 px-4 py-3 sm:px-5 sm:py-3.5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="min-w-0 text-base leading-snug sm:truncate">
+            <span className="font-medium">{eventLabels[event.type]}</span>
+            {shooting ? (
+              <span className="text-ink/60"> sur {shooting}</span>
+            ) : null}
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {onAttach ? (
+              <Button
+                type="button"
+                variant="outline"
+                className={cn(
+                  quietCta,
+                  touchControl,
+                  "w-full shrink-0 sm:w-auto",
+                )}
+                onClick={onAttach}
+              >
+                <Plus />
+                Lier à un shooting
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              className={cn(
+                touchControl,
+                "w-full shrink-0 justify-center sm:w-auto",
+              )}
+              onClick={onDelete}
+            >
+              Supprimer
+            </Button>
+          </div>
+        </div>
+        <div
           className={cn(
-            "inline-flex items-center gap-1.5 whitespace-nowrap",
+            "flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm",
             subtleText,
           )}
         >
-          <Calendar className="size-3.5 shrink-0" aria-hidden />
-          <time dateTime={event.createdAt}>
-            {formatDateTime(event.createdAt)}
-          </time>
-        </p>
-        {onAttach ? (
-          <Button
-            type="button"
-            variant="outline"
-            className={cn(quietCta, touchControl, "w-full")}
-            onClick={onAttach}
-          >
-            <Plus />
-            Lier à un shooting
-          </Button>
-        ) : (
-          <span className="hidden sm:block" aria-hidden />
-        )}
+          <p className="inline-flex shrink-0 items-center gap-1.5">
+            <Calendar className="size-3.5 shrink-0" aria-hidden />
+            <time dateTime={event.createdAt}>
+              {formatActivityDate(event.createdAt)}
+            </time>
+          </p>
+          <p className="inline-flex min-w-0 items-center gap-1.5">
+            <Mail className="size-3.5 shrink-0" aria-hidden />
+            <span className="truncate">{event.email}</span>
+          </p>
+        </div>
       </div>
     </li>
   );
