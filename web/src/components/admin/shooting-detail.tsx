@@ -6,10 +6,13 @@ import {
   Ellipsis,
   Pencil,
   Plus,
+  Search,
   Trash2,
+  X,
 } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
+import { matchesOwnerSearch } from "@/components/admin/match-owner";
 import { ShootingMeta } from "@/components/admin/shooting-meta";
 import { OwnerEmailField } from "@/components/admin/owner-email-field";
 import { OwnerRow } from "@/components/admin/owner-row";
@@ -42,6 +45,7 @@ import {
   addShootingOwner,
   changeOwnerEmail,
   deletePhotos,
+  reorderPhotos,
   removeDog,
   removeShootingOwner,
   updateShooting,
@@ -81,11 +85,18 @@ export function ShootingDetail({
     Shooting["owners"][number] | null
   >(null);
   const [removingOwnerId, setRemovingOwnerId] = useState<string | null>(null);
+  const [ownerQuery, setOwnerQuery] = useState("");
   const empty = shooting.owners.length === 0;
   const showForm = !shooting.archived && (formOpen || empty);
+  const visibleOwners = useMemo(
+    () =>
+      shooting.owners.filter((owner) => matchesOwnerSearch(owner, ownerQuery)),
+    [ownerQuery, shooting.owners],
+  );
 
   useEffect(() => {
     heading.current?.focus();
+    setOwnerQuery("");
   }, [shooting.id]);
 
   async function saveDog(
@@ -232,6 +243,21 @@ export function ShootingDetail({
       toast.error("Impossible de supprimer les photos.");
     } finally {
       setDeletingOwnerId(null);
+    }
+  }
+
+  async function onReorderPhotos(ownerId: string, photoIds: string[]) {
+    if (photoIds.length < 2) return false;
+    try {
+      const result = await reorderPhotos(shooting.id, ownerId, photoIds);
+      if (result === "error") {
+        toast.error("Impossible de changer l'ordre des photos.");
+        return false;
+      }
+      return true;
+    } catch {
+      toast.error("Impossible de changer l'ordre des photos.");
+      return false;
     }
   }
 
@@ -470,33 +496,50 @@ export function ShootingDetail({
         ) : null}
 
         {empty ? null : (
-          <ul className="flex flex-col gap-4">
-            {shooting.owners.map((owner) => (
-              <OwnerRow
-                key={owner.id}
-                owner={owner}
-                archived={shooting.archived}
-                locked={removingKey !== null || removingOwnerId !== null}
-                removingDog={
-                  removingKey?.startsWith(`${owner.id}:`)
-                    ? removingKey.slice(owner.id.length + 1)
-                    : null
-                }
-                uploading={uploadingOwnerId === owner.id}
-                uploadLocked={uploadingOwnerId !== null}
-                deletingPhotos={deletingOwnerId === owner.id}
-                removing={removingOwnerId === owner.id}
-                onAddDog={(name) => addDog(owner.id, name)}
-                onRemoveDog={(name) => void onRemoveDog(owner.id, name)}
-                onUpload={(files) => void onUpload(owner.id, files)}
-                onDeletePhotos={(photoIds) =>
-                  void onDeletePhotos(owner.id, photoIds)
-                }
-                onChangeEmail={(email) => onChangeEmail(owner.id, email)}
-                onRemove={() => setPendingRemove(owner)}
-              />
-            ))}
-          </ul>
+          <>
+            <OwnerSearch
+              id={`owner-search-${shooting.id}`}
+              value={ownerQuery}
+              onValueChange={setOwnerQuery}
+            />
+            {visibleOwners.length === 0 ? (
+              <p className={cn(panelClass, "px-5 py-4 text-sm", subtleText)}>
+                Aucun participant ne correspond à cette recherche.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-4">
+                {visibleOwners.map((owner) => (
+                  <OwnerRow
+                    key={owner.id}
+                    owner={owner}
+                    archived={shooting.archived}
+                    locked={removingKey !== null || removingOwnerId !== null}
+                    removingDog={
+                      removingKey?.startsWith(`${owner.id}:`)
+                        ? removingKey.slice(owner.id.length + 1)
+                        : null
+                    }
+                    uploading={uploadingOwnerId === owner.id}
+                    uploadLocked={uploadingOwnerId !== null}
+                    deletingPhotos={deletingOwnerId === owner.id}
+                    removing={removingOwnerId === owner.id}
+                    onAddDog={(name) => addDog(owner.id, name)}
+                    onRemoveDog={(name) => void onRemoveDog(owner.id, name)}
+                    onUpload={(files) => void onUpload(owner.id, files)}
+                    onDeletePhotos={(photoIds) =>
+                      void onDeletePhotos(owner.id, photoIds)
+                    }
+                    onReorderPhotos={(photoIds) =>
+                      onReorderPhotos(owner.id, photoIds)
+                    }
+                    onReorderDone={onChanged}
+                    onChangeEmail={(email) => onChangeEmail(owner.id, email)}
+                    onRemove={() => setPendingRemove(owner)}
+                  />
+                ))}
+              </ul>
+            )}
+          </>
         )}
 
         {empty && shooting.archived ? (
@@ -617,6 +660,57 @@ export function ShootingDetail({
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function OwnerSearch({
+  id,
+  value,
+  onValueChange,
+}: {
+  id: string;
+  value: string;
+  onValueChange: (value: string) => void;
+}) {
+  return (
+    <div
+      className={cn(
+        panelClass,
+        "focus-within:ring-3 focus-within:ring-canvas/15 relative",
+      )}
+    >
+      <Search
+        aria-hidden
+        className="text-ink/45 pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2"
+      />
+      <label htmlFor={id} className="sr-only">
+        Rechercher par e-mail ou nom du chien
+      </label>
+      <input
+        id={id}
+        type="text"
+        value={value}
+        onChange={(event) => onValueChange(event.target.value)}
+        autoCapitalize="none"
+        autoComplete="off"
+        spellCheck={false}
+        placeholder="E-mail ou nom du chien"
+        className={cn(
+          "placeholder:text-ink/45 h-12 min-h-12 w-full bg-transparent pl-11 pr-4 text-base outline-none sm:h-11 sm:min-h-11 sm:text-sm",
+          value && "pr-12 sm:pr-10",
+        )}
+      />
+      {value ? (
+        <button
+          type="button"
+          aria-label="Effacer la recherche"
+          onClick={() => onValueChange("")}
+          className="text-ink/50 hover:bg-canvas/10 hover:text-ink focus-visible:ring-canvas/40 absolute right-1 top-1/2 grid size-11 -translate-y-1/2 touch-manipulation place-items-center rounded-md transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 sm:size-8"
+        >
+          <X className="size-4" />
+        </button>
+      ) : null}
+    </div>
   );
 }
 

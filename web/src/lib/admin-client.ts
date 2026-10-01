@@ -270,6 +270,23 @@ export async function removeDog(
   return "ok";
 }
 
+export async function reorderPhotos(
+  shootingId: string,
+  ownerId: string,
+  photoIds: string[],
+): Promise<"ok" | "error"> {
+  const response = await request(
+    `/admin/shootings/${shootingId}/owners/${ownerId}/photos/order`,
+    {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ids: photoIds }),
+    },
+  );
+  if (!response?.ok) return "error";
+  return "ok";
+}
+
 export async function deletePhotos(
   shootingId: string,
   ownerId: string,

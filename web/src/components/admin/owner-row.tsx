@@ -1,5 +1,13 @@
 import { cn } from "cn";
-import { Ellipsis, ImageUp, Pencil, Trash2, UserMinus, X } from "lucide-react";
+import {
+  ArrowUpDown,
+  Ellipsis,
+  ImageUp,
+  Pencil,
+  Trash2,
+  UserMinus,
+  X,
+} from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
 import { photoLabel } from "@/components/admin/format";
 import { PhotoStrip } from "@/components/admin/photo-strip";
@@ -46,6 +54,8 @@ type Props = {
   onRemoveDog: (name: string) => void;
   onUpload: (files: File[]) => void;
   onDeletePhotos: (photoIds: string[]) => void;
+  onReorderPhotos: (photoIds: string[]) => Promise<boolean>;
+  onReorderDone: () => void;
   onChangeEmail: (email: string) => Promise<string | null>;
   onRemove: () => void;
 };
@@ -68,6 +78,8 @@ export function OwnerRow({
   onRemoveDog,
   onUpload,
   onDeletePhotos,
+  onReorderPhotos,
+  onReorderDone,
   onChangeEmail,
   onRemove,
 }: Props) {
@@ -78,6 +90,7 @@ export function OwnerRow({
   const [emailError, setEmailError] = useState<string | null>(null);
   const [savingEmail, setSavingEmail] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
+  const [reorderMode, setReorderMode] = useState(false);
   const selectEntryRef = useRef<HTMLButtonElement>(null);
   const canImportPhotos = owner.dogs.length > 0;
   const busy =
@@ -221,6 +234,7 @@ export function OwnerRow({
               aria-disabled={
                 uploadLocked ||
                 selectMode ||
+                reorderMode ||
                 removing ||
                 !canImportPhotos ||
                 undefined
@@ -233,7 +247,11 @@ export function OwnerRow({
                 quietCta,
                 touchControl,
                 "has-focus-visible:ring-3 has-focus-visible:ring-canvas/25 flex-1 cursor-pointer justify-center sm:flex-none",
-                (uploadLocked || selectMode || removing || !canImportPhotos) &&
+                (uploadLocked ||
+                  selectMode ||
+                  reorderMode ||
+                  removing ||
+                  !canImportPhotos) &&
                   "border-canvas/30 bg-canvas/8 text-canvas/55 hover:bg-canvas/8 hover:text-canvas/55 pointer-events-none cursor-not-allowed",
               )}
             >
@@ -250,7 +268,11 @@ export function OwnerRow({
                 multiple
                 className="sr-only"
                 disabled={
-                  uploadLocked || selectMode || removing || !canImportPhotos
+                  uploadLocked ||
+                  selectMode ||
+                  reorderMode ||
+                  removing ||
+                  !canImportPhotos
                 }
                 onChange={(event) => {
                   const input = event.currentTarget;
@@ -288,6 +310,12 @@ export function OwnerRow({
                   <Pencil />
                   Modifier l'e-mail
                 </DropdownMenuItem>
+                {owner.photos.length > 1 ? (
+                  <DropdownMenuItem onClick={() => setReorderMode(true)}>
+                    <ArrowUpDown />
+                    Changer l'ordre des photos
+                  </DropdownMenuItem>
+                ) : null}
                 {owner.photos.length > 0 ? (
                   <DropdownMenuItem
                     variant="destructive"
@@ -316,9 +344,15 @@ export function OwnerRow({
             archived={archived}
             deleting={deletingPhotos}
             selectMode={selectMode}
+            reorderMode={reorderMode}
             idleFocusRef={selectEntryRef}
             onSelectModeChange={setSelectMode}
+            onReorderModeChange={(value) => {
+              setReorderMode(value);
+              if (!value) onReorderDone();
+            }}
             onDelete={onDeletePhotos}
+            onReorder={onReorderPhotos}
           />
         </div>
       ) : null}

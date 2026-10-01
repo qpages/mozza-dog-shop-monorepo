@@ -2,6 +2,7 @@ import { Combobox } from "@base-ui/react/combobox";
 import { cn } from "cn";
 import { ChevronDown, Plus, Search } from "lucide-react";
 import { useEffect, useState, type Ref } from "react";
+import { matchesOwnerSearch } from "@/components/admin/match-owner";
 import { fieldClass, subtleText } from "@/components/admin/styles";
 import { searchOwners, type OwnerSuggestion } from "@/lib/admin-client";
 
@@ -33,7 +34,7 @@ export function OwnerEmailField({
   const query = value.trim().toLowerCase();
   const excluded = new Set(excludeEmails.map((email) => email.toLowerCase()));
   const settled = loadedFor === query;
-  const matched = owners.filter((owner) => matchesOwner(owner, query));
+  const matched = owners.filter((owner) => matchesOwnerSearch(owner, query));
   const visible = matched.filter((owner) => !excluded.has(owner.email));
   const exactKnown = owners.some((owner) => owner.email === query);
   const alreadyHere =
@@ -164,12 +165,6 @@ function emptyCopy(
     return "Aucun participant correspondant. Saisis un e-mail complet pour en créer un.";
   }
   return "Aucun participant correspondant.";
-}
-
-function matchesOwner(owner: OwnerSuggestion, query: string) {
-  if (query === "") return true;
-  if (owner.email.includes(query)) return true;
-  return owner.dogs.some((dog) => dog.toLowerCase().includes(query));
 }
 
 function dogLine(dogs: string[]) {
