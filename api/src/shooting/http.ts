@@ -1,6 +1,6 @@
 import { normalizeIP } from "@fastify/rate-limit";
 import { ZipArchive } from "archiver";
-import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, min, or, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { randomUUID } from "node:crypto";
 import { withDetails } from "../logger.js";
@@ -19,6 +19,11 @@ import {
   photoTitle,
   shootingArchiveFilename,
 } from "./photo-naming.js";
+import {
+  photoListOrder,
+  prependSortOrder,
+  samePhotoSet,
+} from "./photo-order.js";
 import {
   storedObjectKeys,
   ThumbnailError,
@@ -87,7 +92,7 @@ export const shootingRoutes: FastifyPluginAsync = async (app) => {
           shootingOwners: {
             with: {
               shooting: true,
-              photos: { orderBy: [desc(photos.createdAt)] },
+              photos: { orderBy: [...photoListOrder] },
             },
           },
         },
@@ -203,7 +208,7 @@ export const shootingRoutes: FastifyPluginAsync = async (app) => {
             with: {
               owner: true,
               shooting: true,
-              photos: { orderBy: [desc(photos.createdAt)] },
+              photos: { orderBy: [...photoListOrder] },
             },
           },
         },
@@ -271,7 +276,7 @@ export const shootingRoutes: FastifyPluginAsync = async (app) => {
             where: eq(shootingOwners.shootingId, shootingId),
             with: {
               shooting: true,
-              photos: { orderBy: [desc(photos.createdAt)] },
+              photos: { orderBy: [...photoListOrder] },
             },
           },
         },
@@ -360,7 +365,7 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
         shootingOwners: {
           orderBy: [desc(shootingOwners.createdAt)],
           with: {
-            photos: { orderBy: [desc(photos.createdAt)] },
+            photos: { orderBy: [...photoListOrder] },
             owner: true,
           },
         },
@@ -951,19 +956,95 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
       }
 
       const id = objectKey.slice(prefix.length);
-      const [photo] = await app.db
-        .insert(photos)
-        .values({
-          id,
-          shootingOwnerId: sheet.id,
-          objectKey,
-          thumbnailKey,
-          contentType,
-          byteSize,
-        })
-        .returning({ id: photos.id, objectKey: photos.objectKey });
+      const [photo] = await app.db.transaction(async (tx) => {
+        await tx
+          .select({ id: shootingOwners.id })
+          .from(shootingOwners)
+          .where(eq(shootingOwners.id, sheet.id))
+          .for("update");
+        const [front] = await tx
+          .select({ min: min(photos.sortOrder) })
+          .from(photos)
+          .where(eq(photos.shootingOwnerId, sheet.id));
+        return tx
+          .insert(photos)
+          .values({
+            id,
+            shootingOwnerId: sheet.id,
+            objectKey,
+            thumbnailKey,
+            contentType,
+            byteSize,
+            sortOrder: prependSortOrder(front?.min ?? null),
+          })
+          .returning({ id: photos.id, objectKey: photos.objectKey });
+      });
 
       return reply.code(201).send(photo);
+    },
+  );
+
+  app.patch<{
+    Params: { shootingId: string; ownerId: string };
+    Body: { ids: string[] };
+  }>(
+    "/shootings/:shootingId/owners/:ownerId/photos/order",
+    {
+      schema: {
+        params: uuidParams("shootingId", "ownerId"),
+        body: {
+          type: "object",
+          required: ["ids"],
+          additionalProperties: false,
+          properties: {
+            ids: {
+              type: "array",
+              minItems: 2,
+              maxItems: 500,
+              items: { type: "string", format: "uuid" },
+            },
+          },
+        },
+      },
+    },
+    async (request) => {
+      const sheet = await findSheet(
+        app,
+        request.params.shootingId,
+        request.params.ownerId,
+      );
+      const ids = request.body.ids;
+      const existing = await app.db.query.photos.findMany({
+        where: eq(photos.shootingOwnerId, sheet.id),
+        columns: { id: true },
+      });
+      if (
+        !samePhotoSet(
+          ids,
+          existing.map((photo) => photo.id),
+        )
+      ) {
+        throw app.httpErrors.badRequest(
+          "photo order does not match this owner",
+        );
+      }
+
+      await app.db.transaction(async (tx) => {
+        await tx
+          .update(photos)
+          .set({ sortOrder: sql`${photos.sortOrder} - 1000000` })
+          .where(eq(photos.shootingOwnerId, sheet.id));
+        for (const [index, id] of ids.entries()) {
+          await tx
+            .update(photos)
+            .set({ sortOrder: index })
+            .where(
+              and(eq(photos.id, id), eq(photos.shootingOwnerId, sheet.id)),
+            );
+        }
+      });
+
+      return { ids };
     },
   );
 

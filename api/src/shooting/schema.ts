@@ -86,12 +86,17 @@ export const photos = pgTable(
     thumbnailKey: text("thumbnail_key"),
     contentType: text("content_type").notNull(),
     byteSize: integer("byte_size").notNull(),
+    sortOrder: integer("sort_order").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (table) => [
     index("photos_shooting_owner_id_idx").on(table.shootingOwnerId),
+    uniqueIndex("photos_shooting_owner_sort_order_idx").on(
+      table.shootingOwnerId,
+      table.sortOrder,
+    ),
     uniqueIndex("photos_object_key_idx").on(table.objectKey),
     uniqueIndex("photos_thumbnail_key_idx").on(table.thumbnailKey),
     check(
