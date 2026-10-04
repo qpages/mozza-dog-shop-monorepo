@@ -25,6 +25,7 @@ export async function fetchOwnerGallery(
   try {
     const response = await fetch(
       `${resolveApiUrl()}/photos?email=${encodeURIComponent(email)}`,
+      { credentials: "include" },
     );
     if (!response.ok) return null;
     const body = (await response.json()) as { shootings: OwnerShooting[] };
@@ -56,6 +57,7 @@ export async function recordOwnerEvent(input: {
   try {
     await fetch(`${resolveApiUrl()}/owner-events`, {
       method: "POST",
+      credentials: "include",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(input),
     });
@@ -140,7 +142,7 @@ export async function shareArchiveIfPossible(options: {
   if (!canAttemptArchiveShare()) return "unsupported";
 
   try {
-    const response = await fetch(options.url);
+    const response = await fetch(options.url, { credentials: "include" });
     if (!response.ok) return "unsupported";
     const blob = await response.blob();
     const name =

@@ -1,3 +1,5 @@
+import { Avatar, Style } from "@dicebear/core";
+import clay from "@dicebear/styles/clay.json" with { type: "json" };
 import { cn } from "cn";
 import { Calendar, ChevronLeft, Mail, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -36,6 +38,8 @@ import {
   type OwnerEventType,
   type Shooting,
 } from "@/lib/admin-client";
+
+const clayStyle = new Style(clay);
 
 type Props = {
   shootings: Shooting[] | null;
@@ -210,6 +214,7 @@ function ActivityList({
   onDelete: (event: OwnerEvent) => void;
 }) {
   const visible = filterOwnerEvents(events, filters);
+  const groups = groupOwnerEvents(visible);
   const filtering = hasActivityFilters(filters);
 
   return (
@@ -226,16 +231,12 @@ function ActivityList({
         </div>
       ) : (
         <ul className="flex flex-col gap-4">
-          {visible.map((event) => (
-            <ActivityRow
-              key={event.id}
-              event={event}
-              onAttach={
-                isContactRequest(event.type) && !event.shootingId
-                  ? () => onAttach(event.email)
-                  : undefined
-              }
-              onDelete={() => onDelete(event)}
+          {groups.map((group) => (
+            <ActivityGroup
+              key={group.key}
+              group={group}
+              onAttach={onAttach}
+              onDelete={onDelete}
             />
           ))}
         </ul>
@@ -249,27 +250,130 @@ function ActivityList({
   );
 }
 
+type ActivityGroupData = {
+  key: string;
+  emails: string[];
+  events: OwnerEvent[];
+};
+
+function groupOwnerEvents(events: OwnerEvent[]): ActivityGroupData[] {
+  const groups = new Map<string, ActivityGroupData>();
+  for (const event of events) {
+    const key = event.visitorId ?? `legacy:${event.id}`;
+    const group = groups.get(key) ?? { key, emails: [], events: [] };
+    group.events.push(event);
+    if (!group.emails.includes(event.email)) group.emails.push(event.email);
+    groups.set(key, group);
+  }
+  return [...groups.values()];
+}
+
+function ActivityGroup({
+  group,
+  onAttach,
+  onDelete,
+}: {
+  group: ActivityGroupData;
+  onAttach: (email: string) => void;
+  onDelete: (event: OwnerEvent) => void;
+}) {
+  return (
+    <li className={panelClass}>
+      <div className="border-ink/10 flex items-center gap-2.5 border-b px-4 py-3 sm:px-5">
+        <VisitorAvatar name={group.key} />
+        <p className="min-w-0 truncate text-sm font-medium leading-none">
+          {group.emails.join(", ")}
+        </p>
+      </div>
+      <ul className="divide-ink/10 divide-y">
+        {group.events.map((event) => (
+          <ActivityRow
+            key={event.id}
+            event={event}
+            showEmail={group.emails.length > 1}
+            onAttach={
+              isContactRequest(event.type) && !event.shootingId
+                ? () => onAttach(event.email)
+                : undefined
+            }
+            onDelete={() => onDelete(event)}
+          />
+        ))}
+      </ul>
+    </li>
+  );
+}
+
+function VisitorAvatar({ name }: { name: string }) {
+  const src = new Avatar(clayStyle, {
+    seed: name,
+    size: 20,
+    backgroundColor: ["f6f1e6"],
+    bodyColor: ["5b602a", "a55b1b", "8a7344", "a8ab88"],
+    accentColor: ["3f4420", "6e3a12"],
+    inkColor: ["181a07"],
+  }).toDataUri();
+
+  return (
+    <img
+      src={src}
+      alt=""
+      width={20}
+      height={20}
+      aria-hidden
+      className="block size-5 shrink-0 -translate-y-px"
+    />
+  );
+}
+
 function ActivityRow({
   event,
+  showEmail,
   onAttach,
   onDelete,
 }: {
   event: OwnerEvent;
+  showEmail: boolean;
   onAttach?: () => void;
   onDelete: () => void;
 }) {
   const shooting = eventShooting(event);
 
+  const meta = (
+    <div
+      className={cn(
+        "flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm",
+        subtleText,
+      )}
+    >
+      <p className="inline-flex shrink-0 items-center gap-1.5">
+        <Calendar className="size-3.5 shrink-0" aria-hidden />
+        <time dateTime={event.createdAt}>
+          {formatActivityDate(event.createdAt)}
+        </time>
+      </p>
+      {showEmail ? (
+        <p className="inline-flex min-w-0 items-center gap-1.5">
+          <Mail className="size-3.5 shrink-0" aria-hidden />
+          <span className="truncate">{event.email}</span>
+        </p>
+      ) : null}
+    </div>
+  );
+
   return (
-    <li className={panelClass}>
+    <li>
       <div className="flex flex-col gap-2 px-4 py-3 sm:px-5 sm:py-3.5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="min-w-0 text-base leading-snug sm:truncate">
-            <span className="font-medium">{eventLabels[event.type]}</span>
-            {shooting ? (
-              <span className="text-ink/60"> sur {shooting}</span>
-            ) : null}
-          </p>
+          <div className="flex min-w-0 flex-col gap-2">
+            <p className="min-w-0 text-base leading-snug sm:truncate">
+              <span className="font-medium">{eventLabels[event.type]}</span>
+              {shooting ? (
+                <span className="text-ink/60"> sur {shooting}</span>
+              ) : null}
+            </p>
+            <div className="sm:hidden">{meta}</div>
+          </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             {onAttach ? (
               <Button
@@ -300,23 +404,7 @@ function ActivityRow({
             </Button>
           </div>
         </div>
-        <div
-          className={cn(
-            "flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm",
-            subtleText,
-          )}
-        >
-          <p className="inline-flex shrink-0 items-center gap-1.5">
-            <Calendar className="size-3.5 shrink-0" aria-hidden />
-            <time dateTime={event.createdAt}>
-              {formatActivityDate(event.createdAt)}
-            </time>
-          </p>
-          <p className="inline-flex min-w-0 items-center gap-1.5">
-            <Mail className="size-3.5 shrink-0" aria-hidden />
-            <span className="truncate">{event.email}</span>
-          </p>
-        </div>
+        <div className="hidden sm:block">{meta}</div>
       </div>
     </li>
   );

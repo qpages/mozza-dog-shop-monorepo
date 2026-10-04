@@ -134,6 +134,7 @@ export const ownerEvents = pgTable(
     photoId: uuid("photo_id").references(() => photos.id, {
       onDelete: "set null",
     }),
+    visitorId: uuid("visitor_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -143,9 +144,10 @@ export const ownerEvents = pgTable(
     index("owner_events_type_idx").on(table.type),
     index("owner_events_created_at_idx").on(table.createdAt.desc()),
     index("owner_events_shooting_id_idx").on(table.shootingId),
-    // First gallery open only — refreshes must not flood Activité.
+    index("owner_events_visitor_id_idx").on(table.visitorId),
+    // One gallery open per browser and shooting — refreshes must not flood Activité.
     uniqueIndex("owner_events_open_once_idx")
-      .on(table.email, table.shootingId)
+      .on(table.visitorId, table.shootingId)
       .where(
         sql`${table.type} = 'shooting_opened' AND ${table.shootingId} IS NOT NULL`,
       ),

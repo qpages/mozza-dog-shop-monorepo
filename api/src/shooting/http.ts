@@ -38,6 +38,7 @@ import {
   shootingOwners,
   shootings,
 } from "./schema.js";
+import { bindVisitor } from "./visitor.js";
 
 const PHOTO_UPLOAD_REQUIRES_DOG_MESSAGE =
   "Ajoute au moins un chien à ce participant avant d'importer des photos.";
@@ -64,6 +65,12 @@ type SheetRow = typeof shootingOwners.$inferSelect & {
 };
 
 export const shootingRoutes: FastifyPluginAsync = async (app) => {
+  const secureCookie = app.config.NODE_ENV === "production";
+
+  app.addHook("onRequest", async (request, reply) => {
+    bindVisitor(request, reply, secureCookie);
+  });
+
   app.get<{ Querystring: { email: string } }>(
     "/photos",
     {
@@ -173,7 +180,10 @@ export const shootingRoutes: FastifyPluginAsync = async (app) => {
         if (!shooting) throw app.httpErrors.notFound("shooting not found");
       }
 
-      await recordOwnerEvent(app.db, parsed.event);
+      await recordOwnerEvent(app.db, {
+        ...parsed.event,
+        visitorId: bindVisitor(request, reply, secureCookie),
+      });
       return reply.code(204).send();
     },
   );
@@ -236,6 +246,7 @@ export const shootingRoutes: FastifyPluginAsync = async (app) => {
 
       await recordOwnerEventQuiet(app.db, request.log, {
         email,
+        visitorId: bindVisitor(request, reply, secureCookie),
         type: "photo_downloaded",
         shootingId: sheet.shootingId,
         photoId: photo.id,
@@ -288,6 +299,7 @@ export const shootingRoutes: FastifyPluginAsync = async (app) => {
 
       await recordOwnerEventQuiet(app.db, request.log, {
         email,
+        visitorId: bindVisitor(request, reply, secureCookie),
         type: "zip_downloaded",
         shootingId: sheet.shootingId,
         photoId: null,
@@ -339,6 +351,7 @@ export const shootingAdminRoutes: FastifyPluginAsync = async (app) => {
       .select({
         id: ownerEvents.id,
         email: ownerEvents.email,
+        visitorId: ownerEvents.visitorId,
         type: ownerEvents.type,
         shootingId: ownerEvents.shootingId,
         shootingName: shootings.name,

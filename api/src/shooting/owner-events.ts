@@ -3,7 +3,7 @@ import type { Database } from "../db.js";
 import { parseOwnerEmail } from "./owner-email.js";
 import { ownerEvents } from "./schema.js";
 
-export type RecordedOwnerEvent = {
+export type PublicOwnerEvent = {
   email: string;
   type:
     | "shooting_opened"
@@ -15,8 +15,12 @@ export type RecordedOwnerEvent = {
   photoId: string | null;
 };
 
+export type RecordedOwnerEvent = PublicOwnerEvent & {
+  visitorId: string;
+};
+
 export type ParsePublicOwnerEventResult =
-  | { ok: true; event: RecordedOwnerEvent }
+  | { ok: true; event: PublicOwnerEvent }
   | {
       ok: false;
       error: "invalid-email" | "invalid-type" | "shooting-required";
@@ -68,7 +72,7 @@ export async function recordOwnerEvent(
   if (event.type === "shooting_opened" && event.shootingId) {
     const existing = await db.query.ownerEvents.findFirst({
       where: and(
-        eq(ownerEvents.email, event.email),
+        eq(ownerEvents.visitorId, event.visitorId),
         eq(ownerEvents.shootingId, event.shootingId),
         eq(ownerEvents.type, "shooting_opened"),
       ),
@@ -80,6 +84,7 @@ export async function recordOwnerEvent(
   try {
     await db.insert(ownerEvents).values({
       email: event.email,
+      visitorId: event.visitorId,
       type: event.type,
       shootingId: event.shootingId,
       photoId: event.photoId,

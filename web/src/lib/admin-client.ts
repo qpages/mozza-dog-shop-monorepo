@@ -110,6 +110,7 @@ export type OwnerEventType =
 export type OwnerEvent = {
   id: string;
   email: string;
+  visitorId: string | null;
   type: OwnerEventType;
   shootingId: string | null;
   shootingName: string | null;
