@@ -85,7 +85,6 @@ export function archiveFilenameFromShootingName(shootingName: string): string {
 export function triggerArchiveDownload(url: string) {
   const link = document.createElement("a");
   link.href = url;
-  link.download = "";
   link.rel = "noopener";
   document.body.append(link);
   link.click();
@@ -141,6 +140,7 @@ export async function shareArchiveIfPossible(options: {
 }): Promise<"shared" | "aborted" | "unsupported"> {
   if (!canAttemptArchiveShare()) return "unsupported";
 
+  let file: File;
   try {
     const response = await fetch(options.url, { credentials: "include" });
     if (!response.ok) return "unsupported";
@@ -149,18 +149,38 @@ export async function shareArchiveIfPossible(options: {
       filenameFromContentDisposition(
         response.headers.get("Content-Disposition"),
       ) ?? options.fallbackFilename;
-    const file = new File([blob], name || "photos.zip", {
+    file = new File([blob], name || "photos.zip", {
       type: "application/zip",
     });
-    if (!navigator.canShare({ files: [file] })) return "unsupported";
+  } catch {
+    return "unsupported";
+  }
+
+  try {
+    if (!navigator.canShare({ files: [file] })) {
+      downloadBlob(file, file.name);
+      return "shared";
+    }
     await navigator.share({ files: [file], title: options.title });
     return "shared";
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return "aborted";
     }
-    return "unsupported";
+    downloadBlob(file, file.name);
+    return "shared";
   }
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export function viewPhoto(photo: OwnerPhoto) {

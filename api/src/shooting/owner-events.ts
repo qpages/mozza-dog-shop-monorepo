@@ -100,11 +100,12 @@ export async function recordOwnerEventQuiet(
   db: Database,
   log: { warn: (obj: object, msg: string) => void },
   event: RecordedOwnerEvent,
-) {
+): Promise<"recorded" | "duplicate" | "failed"> {
   try {
-    await recordOwnerEvent(db, event);
+    return await recordOwnerEvent(db, event);
   } catch (error) {
     log.warn({ err: error }, "owner event recording failed");
+    return "failed";
   }
 }
 

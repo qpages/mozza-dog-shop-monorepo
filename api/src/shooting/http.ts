@@ -1,7 +1,11 @@
 import { normalizeIP } from "@fastify/rate-limit";
 import { ZipArchive } from "archiver";
 import { and, asc, desc, eq, ilike, inArray, min, or, sql } from "drizzle-orm";
-import type { FastifyInstance, FastifyPluginAsync } from "fastify";
+import type {
+  FastifyInstance,
+  FastifyPluginAsync,
+  FastifyRequest,
+} from "fastify";
 import { randomUUID } from "node:crypto";
 import { withDetails } from "../logger.js";
 import { contentDispositionAttachment } from "../storage.js";
@@ -11,6 +15,7 @@ import {
   parsePublicOwnerEvent,
   recordOwnerEvent,
   recordOwnerEventQuiet,
+  type PublicOwnerEvent,
 } from "./owner-events.js";
 import { changeOwnerEmail } from "./owner-email.js";
 import { drizzleOwnerEmailPort } from "./owner-email-store.js";
@@ -56,6 +61,34 @@ const optionalDogNamesSchema = {
   maxItems: 8,
   items: { type: "string", minLength: 1, maxLength: 80 },
 };
+
+function notifyApiFailure(
+  app: FastifyInstance,
+  request: FastifyRequest,
+  message: string,
+) {
+  return app.notify({
+    scenario: "api.error",
+    status: null,
+    method: request.method,
+    route: request.routeOptions.url ?? request.url,
+    message,
+    requestId: request.id,
+  });
+}
+
+function notifyOwnerEvent(
+  app: FastifyInstance,
+  event: Pick<PublicOwnerEvent, "email" | "type">,
+  shootingName: string | null,
+) {
+  return app.notify({
+    scenario: "owner_event.created",
+    email: event.email,
+    type: event.type,
+    shootingName,
+  });
+}
 
 type PhotoRow = typeof photos.$inferSelect;
 type SheetRow = typeof shootingOwners.$inferSelect & {
@@ -172,18 +205,23 @@ export const shootingRoutes: FastifyPluginAsync = async (app) => {
         throw app.httpErrors.badRequest("invalid event type");
       }
 
+      let shootingName: string | null = null;
       if (parsed.event.type === "shooting_opened" && parsed.event.shootingId) {
         const shooting = await app.db.query.shootings.findFirst({
           where: eq(shootings.id, parsed.event.shootingId),
-          columns: { id: true },
+          columns: { id: true, name: true },
         });
         if (!shooting) throw app.httpErrors.notFound("shooting not found");
+        shootingName = shooting.name;
       }
 
-      await recordOwnerEvent(app.db, {
+      const outcome = await recordOwnerEvent(app.db, {
         ...parsed.event,
         visitorId: bindVisitor(request, reply, secureCookie),
       });
+      if (outcome === "recorded") {
+        void notifyOwnerEvent(app, parsed.event, shootingName);
+      }
       return reply.code(204).send();
     },
   );
@@ -244,13 +282,22 @@ export const shootingRoutes: FastifyPluginAsync = async (app) => {
         }),
       });
 
-      await recordOwnerEventQuiet(app.db, request.log, {
+      const photoEvent = await recordOwnerEventQuiet(app.db, request.log, {
         email,
         visitorId: bindVisitor(request, reply, secureCookie),
         type: "photo_downloaded",
         shootingId: sheet.shootingId,
         photoId: photo.id,
       });
+      if (photoEvent === "recorded") {
+        void notifyOwnerEvent(
+          app,
+          { email, type: "photo_downloaded" },
+          sheet.shooting.name,
+        );
+      } else if (photoEvent === "failed") {
+        void notifyApiFailure(app, request, "owner event recording failed");
+      }
 
       return reply.redirect(url);
     },
@@ -297,13 +344,22 @@ export const shootingRoutes: FastifyPluginAsync = async (app) => {
         throw app.httpErrors.notFound("photos not found");
       }
 
-      await recordOwnerEventQuiet(app.db, request.log, {
+      const zipEvent = await recordOwnerEventQuiet(app.db, request.log, {
         email,
         visitorId: bindVisitor(request, reply, secureCookie),
         type: "zip_downloaded",
         shootingId: sheet.shootingId,
         photoId: null,
       });
+      if (zipEvent === "recorded") {
+        void notifyOwnerEvent(
+          app,
+          { email, type: "zip_downloaded" },
+          sheet.shooting.name,
+        );
+      } else if (zipEvent === "failed") {
+        void notifyApiFailure(app, request, "owner event recording failed");
+      }
 
       const storage = requireStorage(app);
       const zipName = shootingArchiveFilename(sheet.shooting.name);
@@ -314,6 +370,7 @@ export const shootingRoutes: FastifyPluginAsync = async (app) => {
       archive.on("error", (error) => {
         request.log.error({ err: error }, "zip archive failed");
         archive.destroy();
+        void notifyApiFailure(app, request, "zip archive failed");
       });
 
       void (async () => {
@@ -333,6 +390,7 @@ export const shootingRoutes: FastifyPluginAsync = async (app) => {
         } catch (error) {
           request.log.error({ err: error }, "zip archive failed");
           archive.destroy(error instanceof Error ? error : undefined);
+          void notifyApiFailure(app, request, "zip archive failed");
         }
       })();
 

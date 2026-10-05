@@ -1,5 +1,5 @@
 import { Avatar, Style } from "@dicebear/core";
-import clay from "@dicebear/styles/clay.json" with { type: "json" };
+import critters from "@dicebear/styles/critters.json" with { type: "json" };
 import { cn } from "cn";
 import { Calendar, ChevronLeft, Mail, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -39,7 +39,7 @@ import {
   type Shooting,
 } from "@/lib/admin-client";
 
-const clayStyle = new Style(clay);
+const crittersStyle = new Style(critters);
 
 type Props = {
   shootings: Shooting[] | null;
@@ -216,10 +216,17 @@ function ActivityList({
   const visible = filterOwnerEvents(events, filters);
   const groups = groupOwnerEvents(visible);
   const filtering = hasActivityFilters(filters);
+  const visitorLabel = filters.visitorId
+    ? visitorEmails(events, filters.visitorId)
+    : undefined;
 
   return (
     <>
-      <ActivityFiltersBar filters={filters} onChange={onFiltersChange} />
+      <ActivityFiltersBar
+        filters={filters}
+        visitorLabel={visitorLabel}
+        onChange={onFiltersChange}
+      />
       {visible.length === 0 ? (
         <div className={panelClass}>
           <div className="px-5 pb-5 pt-5">
@@ -235,6 +242,13 @@ function ActivityList({
             <ActivityGroup
               key={group.key}
               group={group}
+              selected={filters.visitorId === group.key}
+              onSelectVisitor={() =>
+                onFiltersChange({
+                  ...filters,
+                  visitorId: filters.visitorId === group.key ? null : group.key,
+                })
+              }
               onAttach={onAttach}
               onDelete={onDelete}
             />
@@ -268,22 +282,63 @@ function groupOwnerEvents(events: OwnerEvent[]): ActivityGroupData[] {
   return [...groups.values()];
 }
 
+function visitorEmails(events: OwnerEvent[], visitorId: string) {
+  const emails: string[] = [];
+  for (const event of events) {
+    if (event.visitorId !== visitorId) continue;
+    if (!emails.includes(event.email)) emails.push(event.email);
+  }
+  return emails.join(", ");
+}
+
+function isTrackedVisitor(key: string) {
+  return !key.startsWith("legacy:");
+}
+
 function ActivityGroup({
   group,
+  selected,
+  onSelectVisitor,
   onAttach,
   onDelete,
 }: {
   group: ActivityGroupData;
+  selected: boolean;
+  onSelectVisitor: () => void;
   onAttach: (email: string) => void;
   onDelete: (event: OwnerEvent) => void;
 }) {
+  const label = group.emails.join(", ");
+  const canFilter = isTrackedVisitor(group.key);
+
   return (
     <li className={panelClass}>
-      <div className="border-ink/10 flex items-center gap-2.5 border-b px-4 py-3 sm:px-5">
-        <VisitorAvatar name={group.key} />
-        <p className="min-w-0 truncate text-sm font-medium leading-none">
-          {group.emails.join(", ")}
-        </p>
+      <div className="border-ink/10 flex items-center gap-3 border-b px-4 py-3 sm:px-5">
+        {canFilter ? (
+          <button
+            type="button"
+            className="hover:bg-canvas/8 focus-visible:ring-canvas/40 flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left outline-none focus-visible:ring-2"
+            aria-pressed={selected}
+            aria-label={
+              selected
+                ? "Retirer le filtre visiteur"
+                : `Voir uniquement ${label}`
+            }
+            onClick={onSelectVisitor}
+          >
+            <VisitorAvatar name={group.key} />
+            <p className="min-w-0 break-all text-sm font-medium leading-snug">
+              {label}
+            </p>
+          </button>
+        ) : (
+          <>
+            <VisitorAvatar name={group.key} />
+            <p className="min-w-0 break-all text-sm font-medium leading-snug">
+              {label}
+            </p>
+          </>
+        )}
       </div>
       <ul className="divide-ink/10 divide-y">
         {group.events.map((event) => (
@@ -305,23 +360,19 @@ function ActivityGroup({
 }
 
 function VisitorAvatar({ name }: { name: string }) {
-  const src = new Avatar(clayStyle, {
+  const src = new Avatar(crittersStyle, {
     seed: name,
-    size: 20,
-    backgroundColor: ["f6f1e6"],
-    bodyColor: ["5b602a", "a55b1b", "8a7344", "a8ab88"],
-    accentColor: ["3f4420", "6e3a12"],
-    inkColor: ["181a07"],
+    size: 64,
   }).toDataUri();
 
   return (
     <img
       src={src}
       alt=""
-      width={20}
-      height={20}
+      width={24}
+      height={24}
       aria-hidden
-      className="block size-5 shrink-0 -translate-y-px"
+      className="block size-6 shrink-0"
     />
   );
 }

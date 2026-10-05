@@ -26,12 +26,14 @@ const eventTypes = Object.keys(eventLabels) as OwnerEventType[];
 
 export type ActivityFilters = {
   email: string;
+  visitorId: string | null;
   types: OwnerEventType[];
   range: DateRange | undefined;
 };
 
 export const emptyActivityFilters: ActivityFilters = {
   email: "",
+  visitorId: null,
   types: [],
   range: undefined,
 };
@@ -50,6 +52,7 @@ const menuItemClass =
 export function hasActivityFilters(filters: ActivityFilters) {
   return (
     filters.email.trim() !== "" ||
+    filters.visitorId != null ||
     filters.types.length > 0 ||
     filters.range?.from != null
   );
@@ -70,6 +73,8 @@ export function filterOwnerEvents(
     : null;
 
   return events.filter((event) => {
+    if (filters.visitorId && event.visitorId !== filters.visitorId)
+      return false;
     if (email && !event.email.toLowerCase().includes(email)) return false;
     if (types.size > 0 && !types.has(event.type)) return false;
     if (interval && !isWithinInterval(new Date(event.createdAt), interval)) {
@@ -81,10 +86,11 @@ export function filterOwnerEvents(
 
 type Props = {
   filters: ActivityFilters;
+  visitorLabel?: string;
   onChange: (filters: ActivityFilters) => void;
 };
 
-export function ActivityFiltersBar({ filters, onChange }: Props) {
+export function ActivityFiltersBar({ filters, visitorLabel, onChange }: Props) {
   const [panel, setPanel] = useState<"types" | "dates" | null>(null);
   const active = hasActivityFilters(filters);
 
@@ -256,7 +262,19 @@ export function ActivityFiltersBar({ filters, onChange }: Props) {
         </div>
       </div>
 
-      <div className="min-h-6">
+      <div className="flex min-h-6 flex-wrap items-center gap-x-4 gap-y-2">
+        {filters.visitorId ? (
+          <button
+            type="button"
+            className="bg-paper/15 text-paper hover:bg-paper/25 inline-flex max-w-full items-center gap-1.5 rounded-full px-3 py-1 text-sm"
+            onClick={() => onChange({ ...filters, visitorId: null })}
+          >
+            <span className="min-w-0 truncate">
+              Visiteur : {visitorLabel ?? "sélectionné"}
+            </span>
+            <X className="size-3.5 shrink-0" aria-hidden />
+          </button>
+        ) : null}
         <button
           type="button"
           className={cn(

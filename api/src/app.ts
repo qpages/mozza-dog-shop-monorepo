@@ -13,6 +13,7 @@ import {
   RequestLogController,
   resolveLogLevel,
 } from "./logger.js";
+import notifyPlugin from "./notify.js";
 import { createCorsOriginChecker } from "./origins.js";
 import { shootingRoutes } from "./shooting/http.js";
 import storagePlugin from "./storage.js";
@@ -43,6 +44,7 @@ const envSchema = {
     R2_ACCESS_KEY_ID: { type: "string", default: "" },
     R2_SECRET_ACCESS_KEY: { type: "string", default: "" },
     R2_BUCKET: { type: "string", default: "" },
+    SLACK_WEBHOOK_URL: { type: "string", default: "" },
   },
 };
 
@@ -85,6 +87,7 @@ export async function buildApp() {
   await app.register(rateLimit, { global: false });
   await app.register(dbPlugin);
   await app.register(storagePlugin);
+  await app.register(notifyPlugin);
 
   app.get("/health", async () => ({ ok: true }));
   await app.register(shootingRoutes);

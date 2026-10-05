@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { Database } from "./db.js";
+import type { Notifier } from "./notify.js";
 import type { ObjectStorage } from "./storage.js";
 
 export type AppConfig = {
@@ -17,6 +18,7 @@ export type AppConfig = {
   R2_ACCESS_KEY_ID: string;
   R2_SECRET_ACCESS_KEY: string;
   R2_BUCKET: string;
+  SLACK_WEBHOOK_URL: string;
 };
 
 declare module "fastify" {
@@ -24,6 +26,7 @@ declare module "fastify" {
     config: AppConfig;
     db: Database;
     storage: ObjectStorage | null;
+    notify: Notifier;
   }
 }
 

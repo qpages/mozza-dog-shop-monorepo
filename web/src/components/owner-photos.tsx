@@ -542,7 +542,6 @@ function ArchiveDownloadLink({
       render={
         <a
           href={href}
-          download
           aria-busy={preparing || undefined}
           onClick={(event) => {
             if (
