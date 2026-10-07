@@ -1,9 +1,8 @@
 [
   {
     "AllowedOrigins": [
-      "https://photos.mozzadogshop.com",
-      "https://*.quentinpages.dev",
-      "https://jrtk8wsglhqfewll4swuqysl.178.105.134.143.sslip.io"
+      "https://shooting.mozzadogshop.com",
+      "https://*.quentinpages.dev"
     ],
     "AllowedMethods": ["GET", "PUT", "HEAD"],
     "AllowedHeaders": ["Content-Type"],
