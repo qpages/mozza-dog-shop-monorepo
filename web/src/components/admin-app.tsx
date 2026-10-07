@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { LoginForm } from "@/components/admin/login-form";
 import { ShootingsScreen } from "@/components/admin/shootings-screen";
+import { SiteFooter } from "@/components/site-footer";
 import { SiteMenu } from "@/components/site-menu";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
@@ -90,6 +91,7 @@ export function AdminApp({ defaultEmail = "", defaultPassword = "" }: Props) {
 
       {email ? <ShootingsScreen /> : null}
 
+      <SiteFooter />
       <Toaster position="bottom-right" />
     </div>
   );

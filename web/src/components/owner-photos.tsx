@@ -18,6 +18,7 @@ import {
   rowHover,
   subtleText,
 } from "@/components/admin/styles";
+import { SiteFooter } from "@/components/site-footer";
 import { SiteMenu } from "@/components/site-menu";
 import { PhotoParticipationDialog } from "@/components/photo-participation-dialog";
 import { Button } from "@/components/ui/button";
@@ -221,6 +222,7 @@ export function OwnerPhotos() {
           Accéder à la boutique
         </a>
       ) : null}
+      <SiteFooter clearShopButton={Boolean(email)} />
     </div>
   );
 }
