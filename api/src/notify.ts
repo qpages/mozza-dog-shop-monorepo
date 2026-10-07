@@ -28,9 +28,24 @@ type NotifyLog = {
 export function shouldNotifyHttpError(input: {
   statusCode: number;
   routeNotFound: boolean;
+  method: string;
+  route: string;
 }) {
   if (input.routeNotFound) return false;
+  if (isAnonymousSessionProbe(input)) return false;
   return input.statusCode >= 400;
+}
+
+function isAnonymousSessionProbe(input: {
+  statusCode: number;
+  method: string;
+  route: string;
+}) {
+  return (
+    input.statusCode === 401 &&
+    input.method === "GET" &&
+    input.route === "/admin/session"
+  );
 }
 
 export function formatNotification(notification: Notification) {
@@ -141,6 +156,8 @@ export default fp(
         !shouldNotifyHttpError({
           statusCode,
           routeNotFound: request.is404,
+          method: request.method,
+          route: request.routeOptions.url ?? request.url,
         })
       ) {
         return;
